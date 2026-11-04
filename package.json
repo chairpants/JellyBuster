@@ -1,0 +1,12 @@
+{
+  "name": "jellybuster",
+  "private": true,
+  "type": "module",
+  "description": "A first-person 90s video store, stocked from your own Jellyfin library. The game itself needs no build: open index.html.",
+  "scripts": {
+    "test": "node tests/jellyfin.mjs && node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.53.0"
+  }
+}

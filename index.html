@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf8">
+<title>JellyBuster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">  <!-- the register terminal's font (pos.js) -->
+<style>
+  :root { --bb-blue: #00349c; --bb-blue-dark: #001f5c; --bb-yellow: #ffd400; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #000;
+    font-family: Verdana, Geneva, sans-serif; user-select: none; }
+  canvas { display: block; }
+
+  /* ---------- title / pause screen ---------- */
+  #titleScreen { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; gap: 26px; cursor: pointer; overflow-y: auto; padding: 16px 0;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    background: radial-gradient(ellipse at 50% 30%, #0b2a7a 0%, var(--bb-blue-dark) 55%, #000510 100%); }
+  #logo { background: var(--bb-blue); border: 6px solid var(--bb-yellow); border-radius: 14px;
+    padding: 26px 46px; transform: skewX(-8deg); box-shadow: 0 14px 50px #000c; }
+  #logo h1 { font-family: "Arial Black", Arial, sans-serif; font-style: italic; font-weight: 900;
+    color: var(--bb-yellow); font-size: clamp(40px, 9vw, 96px); letter-spacing: 2px;
+    text-shadow: 3px 3px 0 #0008; }
+  #logo .tag { color: #fff; text-align: center; font-weight: bold; font-size: clamp(12px, 1.8vw, 20px);
+    letter-spacing: 5px; margin-top: 4px; }
+  #enterHint { color: var(--bb-yellow); font-weight: bold; letter-spacing: 3px; font-size: 18px;
+    animation: blink 1.4s infinite; text-shadow: 0 2px 6px #000; }
+  #enterHint i { display: block; width: min(320px, 70vw); height: 6px; margin: 10px auto 0; border-radius: 3px; box-shadow: 0 2px 6px #000;   /* the loading bar (see boot) */
+    background: linear-gradient(to right, var(--bb-yellow) var(--p, 0%), #ffffff30 var(--p, 0%)); }
+  #controlsHelp { color: #cfe0ff; font-size: 13px; line-height: 1.9; text-align: center;
+    background: #0008; padding: 14px 22px; border-radius: 8px; }
+  #controlsHelp b { color: var(--bb-yellow); }
+  #controlsHelp .keys { display: grid; grid-template-columns: auto auto auto auto; gap: 4px 12px; align-items: baseline; }
+  #controlsHelp .keys b { text-align: right; }
+  #controlsHelp .keys span { text-align: left; margin-right: 18px; }
+  #controlsHelp .more { margin-top: 8px; opacity: .8; font-size: 12px; }
+  .tcOnly, html.touch .kbOnly { display: none; } html.touch .tcOnly { display: inline; }
+  @keyframes blink { 50% { opacity: .25; } }
+  /* centred when it fits, scrollable from the top when it doesn't (justify-content: center would cut the logo off) */
+  #titleScreen > :first-child { margin-top: auto; } #titleScreen > :last-child { margin-bottom: auto; }
+  /* keyboard keys or touch controls, whichever this device has (touch.js marks <html class="touch">) */
+  #controlsHelp .keys.tc, html.touch #controlsHelp .keys.kb { display: none; } html.touch #controlsHelp .keys.tc { display: grid; }
+  /* phones on their side and other short screens: everything smaller and closer together */
+  @media (max-height: 560px) {
+    #titleScreen { gap: 12px; }
+    #logo { padding: 10px 26px; border-width: 4px; }
+    #logo h1 { font-size: clamp(30px, 7vw, 56px); }
+    #logo .tag { font-size: 11px; letter-spacing: 3px; }
+    #mainMenu .mm { gap: 7px; }
+    #mainMenu button { font-size: 14px; padding-top: 9px; padding-bottom: 9px; }
+    #controlsHelp { font-size: 12px; line-height: 1.6; padding: 8px 14px; }
+  }
+  /* phones upright: a logo that fits across, and the controls as one list */
+  @media (max-width: 520px) {
+    #logo { padding: 12px 18px; border-width: 4px; max-width: calc(100vw - 40px); }
+    #logo h1 { font-size: 9vw; letter-spacing: 0; }
+    #logo .tag { font-size: 10px; letter-spacing: 2px; }
+    #controlsHelp { width: calc(100vw - 32px); box-sizing: border-box; }
+    #controlsHelp .keys, html.touch #controlsHelp .keys.tc { grid-template-columns: auto 1fr; }
+  }
+  /* ---------- main menu: continue / new game (simulation or sandbox) ---------- */
+  #mainMenu .mm { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: min(420px, calc(100vw - 32px)); }
+  #mainMenu .mm[hidden] { display: none; }
+  #mainMenu button { font: bold 17px Verdana, sans-serif; letter-spacing: 2px; color: #fff; background: var(--bb-blue); cursor: pointer;
+    border: 3px solid var(--bb-yellow); border-radius: 6px; padding: 12px 18px; text-align: center; box-shadow: 0 6px 20px #0008; }
+  #mainMenu button:hover { background: #0a3fa0; transform: translateY(-1px); }
+  #mainMenu button b { display: block; color: var(--bb-yellow); }
+  #mainMenu button small { display: block; font-weight: normal; font-size: 12px; letter-spacing: 0; margin-top: 4px; color: #d6e2ff; line-height: 1.4; }
+  #mainMenu button.back { background: transparent; border-color: #ffffff55; font-size: 13px; padding: 8px; }
+  #mainMenu .warn { color: #ffb3b3; font-size: 12px; text-align: center; }
+  #mainMenu .ttl { color: var(--bb-yellow); font-weight: bold; letter-spacing: 3px; text-align: center; margin-bottom: 2px; }
+  #mainMenu button:disabled { opacity: .45; cursor: default; transform: none; }
+  #mainMenu .set { display: grid; grid-template-columns: 1fr 1.3fr 52px; align-items: center; gap: 10px; color: #fff; font-size: 13px;
+    background: #0008; padding: 8px 12px; border-radius: 6px; }
+  #mainMenu .set input[type=range] { width: 100%; accent-color: var(--bb-yellow); }
+  #mainMenu .set input[type=checkbox] { justify-self: start; width: 18px; height: 18px; accent-color: var(--bb-yellow); }
+  #mainMenu .set span { color: var(--bb-yellow); text-align: right; font-variant-numeric: tabular-nums; }
+  #mainMenu .note { color: #cfe0ff; font-size: 11px; text-align: center; opacity: .8; }
+  /* the three store files: pick one, and what you can do with it opens under it */
+  #mmFiles { display: flex; flex-direction: column; gap: 10px; }
+  #mainMenu .file { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; }
+  #mainMenu .file .n { font: 900 italic 30px "Arial Black", Arial, sans-serif; color: var(--bb-yellow); min-width: 28px; text-align: center; }
+  #mainMenu .file b { display: inline; }
+  #mainMenu .file small { margin-top: 2px; }
+  #mainMenu .file.empty { background: #0a1a45; border-style: dashed; border-color: #ffd40088; }
+  #mainMenu .file.empty b { color: #ffffffaa; }
+  #mainMenu .file.sel { background: #0a3fa0; outline: 3px solid #fff; outline-offset: 2px; }
+  #mainMenu .file.dim { opacity: .45; }
+  #mainMenu .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: -2px 0 4px; }
+  #mainMenu .acts button { flex: 1 1 0; min-width: 0; font-size: 14px; padding: 9px 6px; }
+  #mainMenu .acts button.go { background: var(--bb-yellow); color: var(--bb-blue-dark); }
+  #mainMenu .acts button.go:hover { background: #ffe24d; }
+  #mainMenu .acts button.del { border-color: #ff8080; }
+  #mainMenu .acts button.mode { flex-basis: 100%; text-align: left; }
+  #mainMenu .acts .q { flex-basis: 100%; color: #fff; font-size: 13px; text-align: center; }
+  #mainMenu .acts .q.warn { color: #ffb3b3; }
+  #playHint { color: var(--bb-yellow); font-weight: bold; letter-spacing: 3px; font-size: 18px; text-align: center; animation: blink 1.4s infinite; text-shadow: 0 2px 6px #000; }
+  #titleScreen { cursor: default; }
+  #titleScreen.paused #enterHint { color: #fff; }
+  /* resume screen (already played once) goes translucent so the still-running
+     scene shows through behind it instead of hiding it; first-run intro stays opaque */
+  #titleScreen.paused { background: rgba(3, 10, 30, .55); backdrop-filter: blur(1px); }
+
+  /* ---------- HUD ---------- */
+  /* customer mode: somewhere staff only, and whether you've been seen (the bar: how close they are to calling you on it) */
+  #sneak { position: fixed; z-index: 10; left: 50%; top: 14px; transform: translateX(-50%); display: none; text-align: center; pointer-events: none;
+    color: #cfe0ff; font: bold 12px Verdana, sans-serif; letter-spacing: 2px; text-shadow: 0 1px 2px #000, 0 0 6px #000c; }
+  #sneak i { display: block; width: 180px; height: 5px; margin: 5px auto 0; border-radius: 3px; background: linear-gradient(to right, #ff5a4a var(--h, 0%), #ffffff30 var(--h, 0%)); }
+  #sneak.seen { color: #ff8a7a; }
+  #notePaper { position: fixed; z-index: 11; right: 18px; bottom: 90px; display: none; white-space: pre-wrap; pointer-events: none; max-width: 300px;
+    padding: 14px 18px; background: repeating-linear-gradient(#f6f2e4 0 21px, #a9bedc 21px 22px); color: #1d2a6b; transform: rotate(-1.5deg);
+    font: 15px/22px "Comic Sans MS", "Bradley Hand", cursive; box-shadow: 0 6px 20px #000a; }
+  #cmTerm { position: fixed; z-index: 12; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; margin: 0; padding: 18px 22px; min-width: 360px;
+    background: #031a06; color: #5cff7a; border: 3px solid #2a2a2a; border-radius: 6px; font: 15px/1.45 "Courier New", monospace; text-shadow: 0 0 6px #2bff5a88; box-shadow: 0 0 40px #000c; }
+  #vid { position: fixed; right: 0; bottom: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }   /* drawn on the screens, not itself... */
+  body.fullvid #vid { inset: 0; width: 100vw; height: 100vh; opacity: 1; z-index: 9; object-fit: contain; background: #000; }   /* ...but zoomed all the way in on one: the picture, edge to edge (see fullVidSet) */
+  body.fullvid #crosshair, body.fullvid #hoverTip, body.fullvid #tvHint { display: none; }
+  #fade { position: fixed; inset: 0; z-index: 25; background: #000; opacity: 0; pointer-events: none; transition: opacity .4s;
+    display: flex; align-items: center; justify-content: center; color: #8a8f9a; font: italic 28px Georgia, serif; letter-spacing: 4px; }
+  #crosshair { position: fixed; z-index: 10; left: 50%; top: 50%; width: 6px; height: 6px;
+    margin: -3px; border-radius: 50%; background: var(--bb-yellow); box-shadow: 0 0 4px #000;
+    pointer-events: none; transition: opacity .5s; }
+  body.idle #crosshair { opacity: 0; }     /* fades out after a few still seconds, back on the next move */
+  /* on-screen prompts: bare text with a dark outline, no box */
+  #hoverTip, #holdingTag, #checkoutTag, #tvHint, #shiftClock { text-shadow: 0 1px 2px #000, 0 0 6px #000c, 0 0 12px #0008; }
+  #hoverTip { position: fixed; z-index: 10; left: 50%; top: 68%; transform: translateX(-50%); color: #fff; text-align: center;
+    font-size: 14px; font-weight: bold; white-space: nowrap; pointer-events: none; display: none; }
+  #hoverTip .cat { color: var(--bb-yellow); font-weight: normal; font-size: 11px; }
+  #holdingTag { position: fixed; z-index: 10; right: 16px; top: 14px; text-align: right;
+    color: #fff; font-size: 13px; font-weight: bold; display: none; max-width: 320px; }
+  #holdingTag .h { color: var(--bb-yellow); font-size: 10px; letter-spacing: 2px; }
+  #checkoutTag { position: fixed; z-index: 10; left: 16px; top: 72px; color: #fff;   /* under the clock */
+    font-size: 13px; font-weight: bold; display: none; max-width: 340px; }
+  #checkoutTag .h { color: var(--bb-yellow); font-size: 10px; letter-spacing: 2px; }
+  #checkoutTag .next { margin-top: 4px; font-weight: normal; color: #ffe98a; }
+  /* ---------- the shift clock, and the slip when you clock out ---------- */
+  #shiftClock { position: fixed; z-index: 10; left: 16px; top: 14px; display: none; color: #fff;
+    font-size: 17px; font-weight: bold; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #shiftClock .h { color: var(--bb-yellow); font-size: 10px; letter-spacing: 2px; }
+  #shiftClock.late .h { color: #ff6b6b; }
+  #shiftClock .goals { margin-top: 6px; font-size: 11px; color: #ddd; line-height: 1.5; } #shiftClock .goals .done { color: #7dff9a; } #shiftClock .goals .miss { color: #ff8a8a; }
+  #shiftReport { position: fixed; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; background: rgba(3, 6, 16, .82); animation: slipIn .8s ease-out; }
+  #shiftSlip { margin: 0; padding: 22px 26px 30px; background: #f4f1e6; color: #1d1d1d; font: 15px/1.35 "Courier New", monospace;
+    box-shadow: 0 20px 60px #000c; max-width: calc(100vw - 32px); overflow: auto; border-bottom: 3px dashed #bdb8a6; }
+  #shiftNext { font: bold 15px Verdana, sans-serif; letter-spacing: 1px; color: #fff; background: var(--bb-blue);
+    border: 2px solid var(--bb-yellow); border-radius: 4px; padding: 10px 22px; cursor: pointer; }
+  #shiftNext:hover { background: #0a3fa0; }
+  @keyframes slipIn { from { opacity: 0; } }
+
+  /* ---------- the log: bottom left, fixed height, scrolls ---------- */
+  #actLog { position: fixed; z-index: 10; left: 16px; bottom: 14px; width: min(380px, calc(100vw - 32px)); display: none;
+    background: rgba(4, 8, 20, .55); border: 1px solid #ffffff22; border-radius: 6px; color: #e8e8ee; font-size: 12px; }
+  #actLog .h { padding: 5px 10px; color: var(--bb-yellow); font-size: 10px; font-weight: bold; letter-spacing: 2px; cursor: pointer;
+    border-bottom: 1px solid #ffffff1a; user-select: none; }
+  #actLog .h .k { float: right; color: #ffffff80; letter-spacing: 0; font-weight: normal; }
+  #actLog .h .n { color: #fff; letter-spacing: 0; margin-left: 6px; }
+  #actLogList { height: 148px; overflow-y: auto; padding: 4px 10px 6px; scrollbar-width: thin; scrollbar-color: #ffffff40 transparent; }
+  #actLog.shut #actLogList { display: none; }
+  #actLog.shut .h { border-bottom: 0; }
+  #actLog .row { display: flex; gap: 8px; padding: 2px 0; line-height: 1.3; }
+  #actLog .row .t { color: #ffffff70; flex: none; width: 58px; font-variant-numeric: tabular-nums; }
+  #actLog .row .x { flex: 1; }
+  #actLog .row .a { flex: none; font-weight: bold; font-variant-numeric: tabular-nums; }
+  #actLog .row.good .a { color: #7ee08f; }
+  #actLog .row.bad .x { color: #ffb3b3; }
+  #actLog .row.bad .a { color: #ff7b7b; }
+  body.nohud #actLog { display: none !important; }
+  /* ---------- caught a shoplifter: pick what happens (keys 1-5) ---------- */
+  #catchCall { position: fixed; z-index: 11; left: 50%; top: 24%; transform: translateX(-50%); display: none; max-width: calc(100vw - 32px);
+    background: rgba(40, 6, 10, .72); border: 1px solid #ff6b6b66; border-radius: 6px; padding: 10px 16px; color: #fff; font-size: 13px; text-align: center; }
+  #catchCall .h { color: #ffb3b3; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px; }
+  #catchCall span { display: inline-block; margin: 2px 8px; white-space: nowrap; }
+  #catchCall b { color: var(--bb-yellow); margin-right: 3px; }
+  /* ---------- on the phone: answer with 1 / 2 ---------- */
+  #callPanel { position: fixed; z-index: 11; left: 50%; top: 24%; transform: translateX(-50%); display: none; max-width: calc(100vw - 32px);
+    background: rgba(4, 14, 40, .78); border: 1px solid #7fa6ff66; border-radius: 6px; padding: 10px 16px; color: #fff; font-size: 13px; text-align: center; }
+  #callPanel .h { color: #9fc0ff; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; }
+  #callPanel .q { margin-bottom: 8px; font-size: 14px; } #callPanel .q .cat { color: #ffffff90; font-size: 12px; }
+  #callPanel span { display: inline-block; margin: 2px 8px; white-space: nowrap; }
+  #callPanel > span b { color: var(--bb-yellow); margin-right: 3px; }
+  /* ---------- Dana's job board ---------- */
+  #jobBoard { position: fixed; z-index: 11; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; width: min(560px, calc(100vw - 32px));
+    background: rgba(40, 26, 12, .9); border: 2px solid #b98a55; border-radius: 8px; padding: 12px 16px; color: #fff; font-size: 13px; }
+  #jobBoard .h { color: #ffd98a; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+  #jobBoard .warn { color: #ffb3b3; text-align: center; margin-bottom: 8px; }
+  #jobBoard .job { display: flex; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 4px; border: 1px solid transparent; }
+  #jobBoard .job .pri { display: inline-block; width: 22px; text-align: center; font-weight: bold; border-radius: 3px; background: #ffffff18; }
+  #jobBoard .job .pri.p1 { color: #7ee08f; } #jobBoard .job .pri.p2 { color: #d8e87e; } #jobBoard .job .pri.p3 { color: #f0c070; } #jobBoard .job .pri.p4 { color: #e09a7e; }
+  #jobBoard .job .d { flex: 1; color: #ffffffa0; font-size: 12px; }
+  #jobBoard .job .st { font-weight: bold; color: #7ee08f; font-size: 11px; }
+  #jobBoard .job.off { opacity: .45; } #jobBoard .job.off .st { color: #ff7b7b; }
+  #jobBoard .job.sel { background: #ffffff14; border-color: #ffd98a; }
+  #jobBoard .keys { margin-top: 10px; text-align: center; color: #ffffff90; font-size: 11px; }
+  #jobBoard { width: min(860px, calc(100vw - 32px)); }
+  #jobBoard table.grid { width: 100%; border-collapse: separate; border-spacing: 4px; }
+  #jobBoard th { color: #ffd98a; font-size: 11px; letter-spacing: 1px; font-weight: bold; }
+  #jobBoard th.on { color: #fff; }
+  #jobBoard td.who { text-align: left; font-weight: bold; padding: 4px 6px; white-space: nowrap; }
+  #jobBoard td.who small { display: block; font-weight: normal; color: #ffffff90; font-size: 10px; }
+  #jobBoard td.who.on { color: var(--bb-yellow); }
+  #jobBoard td.cell { text-align: center; font-weight: bold; font-size: 16px; padding: 6px 0; border-radius: 4px; background: #ffffff10; border: 1px solid transparent; }
+  #jobBoard td.cell.p1 { color: #7ee08f; } #jobBoard td.cell.p2 { color: #d8e87e; } #jobBoard td.cell.p3 { color: #f0c070; } #jobBoard td.cell.p4 { color: #e09a7e; }
+  #jobBoard td.cell.p0 { color: #ff7b7b; opacity: .6; }
+  #jobBoard td.cell.sel { border-color: #ffd98a; background: #ffffff22; }
+  #jobBoard td.cell.now::after { content: " ▸"; color: #fff; font-size: 11px; }
+  /* ---------- the skills sheet (K) ---------- */
+  #charSheet { position: fixed; z-index: 11; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; width: min(640px, calc(100vw - 32px));
+    background: rgba(10, 20, 44, .92); border: 2px solid #7fa6ff; border-radius: 8px; padding: 12px 16px; color: #fff; font-size: 13px; }
+  #charSheet .h { color: #9fc0ff; font-weight: bold; letter-spacing: 2px; text-align: center; margin-bottom: 8px; }
+  #charSheet table { width: 100%; border-collapse: separate; border-spacing: 6px 4px; }
+  #charSheet th { color: var(--bb-yellow); font-size: 12px; } #charSheet td { text-align: center; } #charSheet td.who { text-align: left; font-weight: bold; }
+  #charSheet .bar { height: 4px; background: #ffffff22; border-radius: 2px; margin-top: 2px; } #charSheet .bar i { display: block; height: 100%; background: #7ee08f; border-radius: 2px; }
+  #charSheet .legend { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 11px; color: #cfe0ff; }
+  #charSheet .legend b { color: var(--bb-yellow); margin-right: 4px; }
+  /* ---------- hiring: three applicants ---------- */
+  #hireScreen { position: fixed; inset: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: rgba(3, 8, 22, .88); color: #fff; padding: 16px; overflow: auto; }
+  #hireScreen .h { color: var(--bb-yellow); font-weight: bold; letter-spacing: 3px; }
+  #hireScreen .apps { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  #hireScreen .app { width: 220px; background: #0e1a3a; border: 2px solid #2a4d8a; border-radius: 8px; padding: 10px; text-align: center; font-size: 12px; }
+  #hireScreen .app img { width: 180px; height: 220px; background: linear-gradient(#1a2a55, #0b1430); border-radius: 6px; }
+  #hireScreen .nm { font-size: 15px; font-weight: bold; margin-top: 6px; } #hireScreen .lk { color: #cfe0ff; font-size: 11px; margin: 2px 0 6px; }
+  #hireScreen table { width: 100%; font-size: 11px; } #hireScreen td:first-child { color: var(--bb-yellow); text-align: left; width: 34px; } #hireScreen td:last-child { width: 14px; }
+  #hireScreen .pips i { display: inline-block; width: 10px; height: 8px; margin-right: 2px; background: #7ee08f; border-radius: 2px; }
+  #hireScreen .wage { color: #cfe0ff; margin: 6px 0; }
+  #hireScreen button { font: bold 13px Verdana, sans-serif; color: #fff; background: var(--bb-blue); border: 2px solid var(--bb-yellow); border-radius: 4px; padding: 8px 12px; cursor: pointer; width: 100%; }
+  #hireScreen button.none { width: auto; background: transparent; border-color: #ffffff55; }
+
+  #tvHint { position: fixed; z-index: 10; left: 50%; bottom: 96px; transform: translateX(-50%);   /* clear of the inventory bar */
+    color: #fff; font-size: 13px; font-weight: bold; display: none; }
+
+  /* ---------- held-up tape overlay ---------- */
+  #inspect { position: fixed; z-index: 12; inset: 0; display: none; align-items: center;
+    justify-content: flex-end; flex-direction: column; padding-bottom: 12px; box-sizing: border-box; pointer-events: none; }
+  #inspectCap { text-align: center; text-shadow: 0 1px 2px #000, 0 0 8px #000c; max-width: 80vw; }
+  #inspectCap .t { color: #fff; font-size: 16px; font-weight: bold; }
+  #inspectCap .s { color: var(--bb-yellow); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+  #inspectCap .k { color: #cfe0ff; font-size: 11px; margin-top: 3px; opacity: .75; }
+  body.boxup #crosshair, body.boxup #hoverTip { display: none !important; }
+
+  /* ---------- one-line notices (e.g. shelving an unrewound tape) ---------- */
+  #toast { position: fixed; z-index: 12; left: 50%; top: 18%; transform: translateX(-50%); display: none;
+    background: #8c1c1c; color: #fff; border: 2px solid var(--bb-yellow); border-radius: 4px; padding: 8px 16px;
+    font-size: 14px; font-weight: bold; white-space: nowrap; box-shadow: 0 6px 20px #000a; }
+  body.nohud #toast { display: none !important; }
+
+  /* ---------- inventory bar: shows once you carry 2+ things ---------- */
+  /* golf on the roof: the swing meter (fill = power; the line runs back down it; the mark near the bottom is the sweet spot) */
+  #golfHud { position: fixed; z-index: 11; right: 34px; bottom: 90px; display: flex; align-items: flex-end; gap: 14px; pointer-events: none; }
+  #golfHud[hidden] { display: none; }
+  #golfMeter { position: relative; width: 26px; height: 280px; border: 3px solid #fff; border-radius: 5px; background: #0008; box-shadow: 0 2px 8px #000a; overflow: hidden; }
+  #golfMeter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pow, 0%); background: linear-gradient(to top, #3fcf6a, var(--bb-yellow) 70%, #e23232); }
+  #golfMeter .mark { position: absolute; left: 0; right: 0; bottom: calc(8% - 1.5%); height: 3%; background: #fff; box-shadow: 0 0 6px #fff; }
+  #golfMeter .line { position: absolute; left: -2px; right: -2px; bottom: var(--line, 0%); height: 3px; background: #ff2e88; display: none; }
+  #golfHud.back .line { display: block; }
+  #golfInfo { color: #fff; font: bold 13px Arial, sans-serif; text-align: right; line-height: 1.6; text-shadow: 0 2px 4px #000; max-width: 260px; }
+  #golfInfo b { color: var(--bb-yellow); }
+  #invBar { position: fixed; z-index: 11; left: 50%; bottom: 14px; transform: translateX(-50%); display: none; gap: 6px; pointer-events: none; }
+  #invBar .slot { position: relative; width: 58px; height: 58px; background: #ffffff40; border: 3px solid #ffffff40; border-radius: 4px;
+    box-shadow: 0 2px 8px #0008; display: flex; align-items: center; justify-content: center; }
+  #invBar .slot.sel { border-color: var(--bb-yellow); outline: 3px solid var(--bb-blue); transform: translateY(-4px); }
+  #invBar .slot img { max-width: 46px; max-height: 50px; object-fit: contain; }
+  #invBar .slot span { position: absolute; left: 3px; top: 1px; font: bold 10px Arial, sans-serif; color: #889; }
+  /* tape wind bar: faint green = rewound, red fills in as far as it's played */
+  #invBar .slot .wind { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, #e23232 var(--w), #3fcf6a80 var(--w)); }
+
+  /* ---------- register terminal (pos.js): an 80x30 DOS-app CRT, painted on a canvas ---------- */
+  #posTerm { position: fixed; z-index: 30; inset: 0; display: flex; align-items: center; justify-content: center; background: #000c; }
+  #posTerm[hidden] { display: none; }
+  #posTerm canvas { width: min(94vw, calc((100vh - 60px) * 4 / 3)); aspect-ratio: 4 / 3; background: #0000aa; border: 14px solid #cfc7b2; border-radius: 18px;
+    box-shadow: inset 0 0 80px #000a, 0 20px 80px #000; cursor: none; }      /* the highlighted cell is the cursor */
+
+  /* ---------- H toggles every HUD overlay off ---------- */
+  body.nohud #nowPlaying, body.nohud #tvHint,
+  body.nohud #hoverTip, body.nohud #holdingTag, body.nohud #checkoutTag, body.nohud #shiftClock, body.nohud #invBar, body.nohud #crosshair { display: none !important; }
+
+  /* ---------- now playing: quiet corner caption ---------- */
+  #nowPlaying { position: fixed; z-index: 10; right: 16px; bottom: 12px; display: none;
+    color: rgba(255, 255, 255, .72); font-size: 12px; max-width: 46vw; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px #000; pointer-events: none; }
+  /* winding through a tape (V / N held): where you've got to, just over the caption, and shown even with the HUD hidden or the picture full screen */
+  #scrubBar { position: fixed; z-index: 11; right: 16px; bottom: 32px; width: min(340px, 46vw); display: none; pointer-events: none;
+    padding: 6px 9px; white-space: nowrap; background: rgba(0, 0, 0, .55); border-radius: 4px; color: #fff; font: bold 12px "Courier New", monospace; text-shadow: 0 1px 2px #000; }
+  #scrubBar > * { display: inline-block; vertical-align: middle; }
+  #scrubDir { width: 20px; color: #ffd400; }
+  #scrubTrack { width: calc(100% - 146px); height: 6px; margin: 0 8px; background: rgba(255, 255, 255, .22); border-radius: 3px; overflow: hidden; }
+  #scrubFill { height: 100%; width: 0; background: #ffd400; }
+</style>
+</head>
+<body>
+<div id="titleScreen">
+  <div id="logo">
+    <h1>JELLYBUSTER</h1>
+    <div class="tag">WOW! WHAT A SELECTION.</div>
+  </div>
+  <div id="enterHint">LOADING…<i></i></div>
+  <div id="mainMenu" hidden>
+    <div class="mm" id="mmMain">
+      <div id="playHint" hidden></div>
+      <div class="ttl" id="mmTitle">SELECT A STORE</div>
+      <div id="mmFiles"></div>
+      <button id="mmSettingsBtn" class="back">SETTINGS</button>
+    </div>
+    <div class="mm" id="mmSettings" hidden>
+      <div class="ttl">SETTINGS</div>
+      <label class="set">Store sounds <input type="range" id="setSound" min="0" max="100" step="5"><span id="setSoundV"></span></label>
+      <label class="set">TV volume <input type="range" id="setTv" min="0" max="100" step="5"><span id="setTvV"></span></label>
+      <label class="set">Mouse sensitivity <input type="range" id="setSens" min="25" max="300" step="5"><span id="setSensV"></span></label>
+      <label class="set">Invert mouse Y <input type="checkbox" id="setInvert"><span id="setInvertV"></span></label>
+      <label class="set">Smooth edges <input type="checkbox" id="setAA"><span id="setAAV"></span></label>
+      <label class="set">Shift length <input type="range" id="setShift" min="10" max="60" step="1"><span id="setShiftV"></span></label>
+      <div class="note">Shift length is real minutes from opening to midnight.</div>
+      <div class="note" id="setJelly"></div>
+      <button id="setUnlink" class="back">UNLINK JELLYFIN</button>
+      <button id="mmSettingsBack" class="back">BACK</button>
+    </div>
+  </div>
+  <div id="controlsHelp">
+    <div class="keys kb">
+      <b>W A S D</b><span>move</span>      <b>MOUSE</b><span>look</span>
+      <b>CLICK</b><span>grab</span>         <b>RIGHT-CLICK</b><span>put back</span>
+      <b>E / Q</b><span>interact</span>         <b>1–9 / WHEEL</b><span>switch items</span>
+      <b>SHIFT</b><span>hustle</span>       <b>L</b><span>skip an hour</span>
+      <b>J</b><span>the log</span>           <b>H</b><span>hide the HUD</span>
+      <b>M</b><span>store sounds</span>       <b>K</b><span>skills</span>
+      <b>T</b><span>captions (tape on)</span>  <b>R</b><span>turn a tape over</span>
+    </div>
+    <div class="keys tc">
+      <b>LEFT THUMB</b><span>move</span>       <b>DRAG</b><span>look</span>
+      <b>TAP IT</b><span>use / grab it</span>  <b>TWO-FINGER TAP</b><span>put back</span>
+      <b>LONG PRESS</b><span>lift / move it</span>  <b>PUSH FAR</b><span>hustle</span>
+      <b>TAP A SLOT</b><span>switch items</span>   <b>TAP THE CLOCK</b><span>menu</span>
+    </div>
+    <div class="more">Most things do something. Poke around. &nbsp;·&nbsp; <b class="kbOnly">ESC</b><b class="tcOnly">tap the clock:</b> menu</div>
+  </div>
+</div>
+
+<div id="crosshair" hidden></div>
+<div id="sneak"><span></span><i></i></div>
+<div id="fade"></div>
+<div id="notePaper"></div>
+<pre id="cmTerm"></pre>
+<div id="hoverTip"></div>
+<div id="holdingTag"><div class="h">HOLDING</div><div id="holdingName"></div></div>
+<div id="checkoutTag"></div>
+<div id="shiftClock"></div>
+<div id="catchCall"></div>
+<div id="callPanel"></div>
+<div id="jobBoard"></div>
+<div id="charSheet"></div>
+<div id="hireScreen"></div>
+<div id="actLog"><div class="h" onclick="logToggle()">LOG<span class="n"></span><span class="k">J hide · PgUp/PgDn</span></div><div id="actLogList"></div></div>
+<div id="shiftReport"><pre id="shiftSlip"></pre><button id="shiftNext">NEXT SHIFT ▸</button></div>
+<div id="golfHud" hidden><div id="golfInfo"></div><div id="golfMeter"><i class="fill"></i><i class="mark"></i><i class="line"></i></div></div>
+<div id="invBar"></div>
+<div id="toast"></div>
+<div id="tvHint"></div>
+<div id="inspect"><div id="inspectCap"><div class="t" id="inspectTitle"></div><div class="s" id="inspectSec"></div><div class="k">R turn over · wheel zoom · mouse tilt</div></div></div>
+
+<div id="nowPlaying"></div>
+<div id="scrubBar"><span id="scrubDir"></span><span></span><span id="scrubTrack"><div id="scrubFill"></div></span><span></span></div>
+<!-- TV picture menu's SHARPEN: unsharp-mask convolution the screen canvas filters
+     through (kernel set by applyTv()) -->
+<svg width="0" height="0" style="position:absolute">
+  <filter id="tvSharpen" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feConvolveMatrix id="tvSharpenMatrix" order="3" kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/>
+  </filter>
+</svg>
+
+  <!-- off-screen decode source for the VideoTexture — never displayed, just sampled -->
+  <video id="vid" crossorigin="anonymous" playsinline></video>
+
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>  <!-- what the browser can't play straight off the server comes as HLS -->
+<script src="jellyfin.js"></script>  <!-- window.Jelly: the link to your Jellyfin, and the store's stock (window.STORE_CATALOG) -->
+<script src="cutout.js"></script>       <!-- embedded: the Dracula standee -->
+<script src="customers.js"></script>  <!-- window.StoreCustomers: TV-head customers, built from store/ -->
+<script src="couch.js"></script>   <!-- window.buildCouch(); uses THREE lazily, called from store/ -->
+<script src="pos.js"></script>     <!-- window.createPOS(); the register's terminal, created from store/ -->
+<script src="exterior/trees.js"></script>     <!-- window.StoreTrees: the trees outside (instanced), swaying, through the seasons; built from store/ -->
+<script src="ambience.js"></script>  <!-- window.StoreAmbience: the store's sound (hum, room tone, traffic, chime, footsteps), modelled not recorded -->
+<script src="touch.js"></script>     <!-- touchscreen controls on phones / tablets (?touch=1 to force) -->
+<script type="module">
+  // file:// can't load local files as ES modules, so: import three from the CDN
+  // here (https CORS is fine), expose the globals, then load the game (store/, tonys/, exterior/:
+  // one shared scope, in this order) as classic scripts — which file:// happily allows.
+  import * as THREE from "three";
+  import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+  import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+  import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+  import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+  window.THREE = THREE; window.mergeGeometries = mergeGeometries;
+  window.UnrealBloomPass = UnrealBloomPass; window.ShaderPass = ShaderPass;
+  window.OutputPass = OutputPass;
+  await window.Jelly.ready;   // linked, and the library's in: the game reads its stock as it loads
+  // Keys and the mouse wait for the last file: a handler from one file can't run before the files after it are in.
+  const INPUT = ["keydown", "keyup", "mousemove", "mousedown", "mouseup", "click", "wheel", "contextmenu"], hold = e => e.stopImmediatePropagation();
+  for (const t of INPUT) addEventListener(t, hold, true);
+  for (const f of ["store/core", "store/shell", "store/backrooms", "store/theater", "exterior/lot", "exterior/grounds", "exterior/serviceroad", "store/lobby", "store/shelves", "store/theaterlobby", "store/lounge",
+    "store/shift", "exterior/sky", "store/clock", "store/player", "store/shoppers", "store/staff", "store/checkout", "store/phone", "tonys/light", "tonys/inside", "tonys/cabinets", "tonys/arcade", "tonys/missile", "tonys/yard",
+    "tonys/outside", "store/roofkit", "store/roof", "store/chores", "store/tapebox", "store/tv", "store/title", "store/customer-mode", "store/main"]) {
+    const s = document.createElement("script"); s.src = `${f}.js`; s.async = false;   // async off: run in order, not as they arrive
+    if (f === "store/main") s.onload = s.onerror = () => { for (const t of INPUT) removeEventListener(t, hold, true); };
+    document.body.appendChild(s);
+  }
+</script>
+</body>
+</html>
