@@ -240,9 +240,29 @@ window.StoreAmbience = (() => {
       });
     });
   }
-  function step(x, z, tile, weight = 1) {          // heel strike + sole scuff
+  function step(x, z, tile, weight = 1, ground = null) {   // heel strike + sole scuff; ground: "snow" (it crunches instead), "wet" (a slap and a little splash on top)
     if (!ac || muted || fade === 0) return;
     const t0 = ac.currentTime + Math.random() * 0.01, p = panner(x, 0.05, z, 1.2, 1.6), out = ac.createGain();
+    if (ground === "snow") {                      // the crystals giving way under the foot: a run of tiny crackles over a soft, boxed-in thump, no heel at all
+      out.gain.value = 0.15 * weight * (0.8 + Math.random() * 0.4); out.connect(p); p.connect(bed); p.connect(verbIn);
+      const th = ac.createOscillator(), tg = ac.createGain(); th.frequency.setValueAtTime(82, t0); th.frequency.exponentialRampToValueAtTime(45, t0 + 0.11);
+      tg.gain.setValueAtTime(0, t0); tg.gain.linearRampToValueAtTime(0.42, t0 + 0.02); tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15);
+      th.connect(tg).connect(out); th.start(t0); th.stop(t0 + 0.17);
+      for (let i = 0, n = 6 + Math.floor(Math.random() * 5); i < n; i++) {
+        const at = t0 + 0.005 + (i / n) ** 1.4 * (0.16 + Math.random() * 0.05), d = 0.012 + Math.random() * 0.024, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+        s.buffer = noise.white; f.type = "bandpass"; f.frequency.value = 900 + Math.random() * 2100; f.Q.value = 1.2 + Math.random() * 2;
+        g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime((0.55 + Math.random() * 0.75) * (1 - 0.45 * i / n), at + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        s.connect(f).connect(g).connect(out); s.start(at, Math.random() * 3); s.stop(at + d + 0.01);
+      }
+      return;
+    }
+    if (ground === "wet") {                       // water thrown off the sole as it lands, and a smaller one as it peels away
+      for (const [at, lvl, len] of [[t0 + 0.004, 0.09 * weight, 0.15], [t0 + 0.13, 0.035 * weight, 0.09]]) {
+        const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = noise.white; f.type = "highpass"; f.frequency.value = 1500 + Math.random() * 1300;
+        g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(lvl * (0.75 + Math.random() * 0.5), at + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+        s.connect(f).connect(g).connect(p); s.start(at, Math.random() * 3); s.stop(at + len + 0.01);
+      }
+    }
     out.gain.value = (tile ? 0.16 : 0.09) * weight * (0.8 + Math.random() * 0.4); out.connect(p); p.connect(bed); p.connect(verbIn);
     const th = ac.createOscillator(), tg = ac.createGain(); th.frequency.setValueAtTime(tile ? 140 : 95, t0); th.frequency.exponentialRampToValueAtTime(55, t0 + 0.06);
     tg.gain.setValueAtTime(0, t0); tg.gain.linearRampToValueAtTime(tile ? 0.5 : 0.8, t0 + 0.004); tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);

@@ -388,15 +388,41 @@
     at(0.04, 0.04, W.z1 - W.z0 + 0.08, iron, W.x0 - 0.08, 1.0, (W.z0 - 0.08 + W.z1) / 2, true, g); at(0.03, 0.03, W.z1 - W.z0 + 0.08, iron, W.x0 - 0.08, 0.5, (W.z0 - 0.08 + W.z1) / 2, true, g);
     at(xo - W.x0, 0.04, 0.04, iron, (W.x0 + xo) / 2, 1.0, W.z0 - 0.08, true, g); at(xo - W.x0, 0.03, 0.03, iron, (W.x0 + xo) / 2, 0.5, W.z0 - 0.08, true, g);
   }
+
+  // the store's emergency exit, the same door again: in the east wall just past the end of its shelves, one way, out to the alley by the dumpster. Its leaf out at the wall's outside face, hinged at the back end, swinging out; a lit EXIT over it inside; a wall pack over it outside (the notice on it: see buildGrounds)
+  {
+    const { z0, z1 } = STORE_EXIT, zc = (z0 + z1) / 2, xi = STORE.x - WALL_T / 2, xo = STORE.x + WALL_T / 2 + 0.005, lam = c => new THREE.MeshLambertMaterial({ color: c }), LW = z1 - z0 + 0.03, LH = DOOR_H + 0.02;   // (the leaf's a little bigger than its opening every way, lapping the wall behind its edges: no daylight round it)
+    const at = (w, h, d, m, x, y, z, out = false, par = scene) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); par.add(o); if (out) o.layers.set(EXTERIOR_LAYER); return o; };
+    const frame = lam(0x2b2d30), steel = lam(0x3a3d42);
+    for (const [a, b, y0, y1] of [[z0, z0 + 0.05, 0, DOOR_H], [z1 - 0.05, z1, 0, DOOR_H], [z0, z1, DOOR_H - 0.05, DOOR_H]]) at(0.06, y1 - y0, b - a, frame, xi - 0.03, (y0 + y1) / 2, (a + b) / 2);   // its frame, inside
+    for (const z of [z0 + 0.01, z1 - 0.01]) at(xo - xi, DOOR_H, 0.02, frame, (xi + xo) / 2, DOOR_H / 2, z);   // the opening's reveal, through the wall
+    at(xo - xi, 0.02, z1 - z0, frame, (xi + xo) / 2, DOOR_H - 0.01, zc); at(xo - xi + 0.12, 0.012, z1 - z0, lam(0x9a9a96), (xi + xo) / 2 + 0.06, 0.006, zc);   // its head, a concrete sill
+    at(0.26, 0.15, 0.36, lam(0x141414), xi - 0.14, 2.4, zc);   // (its box reaches out past the blue stripe that runs round the room)
+    const sign = exitSignMesh(0.35); sign.position.set(xi - 0.2705, 2.4, zc); sign.rotation.y = -Math.PI / 2; scene.add(sign);
+    const leaf = new THREE.Group(); leaf.position.set(xo, 0, z1 + 0.015); scene.add(leaf);   // (local -z: along the leaf from its hinge. Turned -y, it swings out, +x)
+    const inner = at(0.025, LH, LW, steel, -0.0125, LH / 2, -LW / 2, false, leaf);
+    const bar = at(0.05, 0.04, LW - 0.2, lam(0xb8bcc2), -0.07, 1, -LW / 2, false, leaf);   // the panic bar
+    const ends = [0.1, LW - 0.1].map(z => at(0.07, 0.08, 0.08, lam(0x8f9398), -0.06, 1, -z, false, leaf));
+    at(0.02, LH, LW, lam(0x6b7078), 0.01, LH / 2, -LW / 2, true, leaf);
+    for (const y of [0.5, 1.2, 1.9]) at(0.025, 0.1, 0.03, lam(0x9da3a8), 0.02, y, -0.01, true, leaf);   // its hinges
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.04, LH, LW), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0.04, LH / 2, -LW / 2); leaf.add(hit);   // (the outside's on the exterior layer, which the aiming ray doesn't see)
+    for (const o of [inner, bar, ...ends]) { o.userData.fireExit = "in"; o.userData.exitDoor = storeExit; aimables.push(o); }
+    hit.userData.fireExit = "out"; hit.userData.exitDoor = storeExit; aimables.push(hit);
+    storeExit.leaf = leaf; storeExit.w = LW;
+    colliders.push(storeExit.shut = { x0: STORE.x - 0.18, x1: STORE.x + 0.18, z0, z1 });   // (while its door's shut)
+    at(0.2, 0.22, 0.32, lam(0x5a4b3a), xo + 0.1, DOOR_H + 0.28, zc, true); at(0.17, 0.01, 0.28, lam(0xf1e3b5), xo + 0.105, DOOR_H + 0.165, zc, true);   // the wall pack over it
+  }
 }
 
-function fireExitUse(side) {                   // E on the theater's emergency exit: from inside, the bar pushed and it swings open; from outside, nothing to open it by
+function fireExitUse(side, E = fireExit) {       // E on an emergency exit: from inside, the bar pushed and it swings open; from outside, nothing to open it by
   if (side !== "in") { toast("No handle this side: it only opens from inside"); return; }
-  if (!fireExit.open) { fireExit.open = true; fireExit.t = 0; window.StoreAmbience?.door("push", "open", fireExit.leaf.position.x, 0, fireExit.leaf.position.z); }
+  if (!E.open) { E.open = true; E.t = 0; window.StoreAmbience?.door("push", "open", E.leaf.position.x, 0, E.leaf.position.z); }
 }
-function fireExitTick(dt) {                       // the door: out of your way while it's open; its closer pulls it shut once you're clear of it
-  const E = fireExit, { z0, z1 } = FIRE_EXIT; if (!E.leaf) return;
-  const zc = (z0 + z1) / 2, near = Math.abs(player.z - zc) < 1.4 && player.x < WALL_L + 1.2 && player.x > FIRE_EXIT.well.x0 - 0.5 && !player.onRoof;
+function fireExitTick(dt) {
+  if (fireExit.leaf) { const { z0, z1 } = FIRE_EXIT; exitDoorTick(fireExit, dt, Math.abs(player.z - (z0 + z1) / 2) < 1.4 && player.x < WALL_L + 1.2 && player.x > FIRE_EXIT.well.x0 - 0.5 && !player.onRoof); }
+  if (storeExit.leaf) { const { z0, z1 } = STORE_EXIT; exitDoorTick(storeExit, dt, Math.abs(player.z - (z0 + z1) / 2) < 1.4 && Math.abs(player.x - STORE.x) < 1.3 && !player.onRoof); }
+}
+function exitDoorTick(E, dt, near) {              // the door: out of your way while it's open; its closer pulls it shut once you're clear of it
   if (E.open && !near && (E.t += dt) > 1.5) E.open = false;
   else if (near) E.t = 0;
   const was = E.a; E.a = Math.max(0, Math.min(1, E.a + (E.open ? 2.0 : -0.9) * dt));

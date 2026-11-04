@@ -32,6 +32,8 @@ const BOH_DOORS = { store: 4.6, restroom: 5.0, restroomF: 3.0, breakroom: 8.55, 
 const breakFx = { clock: null, punch: null, clock12: null, coffee: null, coffeeLed: null, tv: null, tvMesh: null, vcr: null, tvT: 0 };   // the break room's moving parts (see breakroomTick)
 const closetBulb = { mat: null };                 // the closet's bare bulb (its glass goes warm white when the "closet" zone is on)
 const fireExit = { leaf: null, shut: null, a: 0, open: false, t: 0 };   // the theater's emergency exit door: its leaf, its collider while it's shut, how far it's swung (see fireExitTick)
+const storeExit = { leaf: null, shut: null, a: 0, open: false, t: 0 };   // and the store's, past the end of the east wall's shelves
+const STORE_EXIT = { z0: 26.3, z1: 27.4 };       // where along that wall
 const boothGlow = { lamps: null, stairs: null, red: null };   // the booth's wall lamps' lenses, the stairwell's bulbs, the booth's red working lights (on while its lights are off)
 const CLOSET = { x0: 9.4, x1: STORE.x, doorW: 0.8 };   // the hall's end, x0 its wall across the hall (the door's in it) to the building's side wall
 const SCUPPERS = [[-7.84, 12, 1, 0], [-7.84, 26, 1, 0], [11.1, 6, -1, 0], [11.1, 21, -1, 0], [-3.0, 48.6, 0, -1], [7.5, 35.1, 0, -1]];   // the overflow scuppers through the parapet: where on the outer face, and its inward normal
@@ -214,7 +216,7 @@ const TVU = {
   uSunSky: { value: new THREE.Color() }, uSunGround: { value: new THREE.Color() }, uSunC: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3() },
   uMoonSky: { value: new THREE.Color() }, uMoonGround: { value: new THREE.Color() }, uMoonC: { value: new THREE.Color() }, uMoonDir: { value: new THREE.Vector3() },
   uDayC: { value: new THREE.Color() }, uNightC: { value: new THREE.Color() },       // what comes in through the storefront glass by day / by night
-  uFogC: { value: new THREE.Color() }, uFogD: { value: 0 },                          // fog outdoors (see wxSky): its color, and density per meter
+  uFogC: { value: new THREE.Color() }, uFogD: { value: 0 }, uFogCam: { value: 0 },                          // fog outdoors (see wxSky): its color, and density per meter
   uThLight: { value: new THREE.Vector4(1, 1, 1, 1) },   // lobby switch, theater house-lights switch, the booth's, its stairs'
   uTall: { value: new THREE.Vector4(2.72, 6.0, 29.7, 0) },   // the tall block: the booth over the lobby from this high, its ceiling and the auditorium's, the booth from this z
   uShaft: { value: new THREE.Vector2(-0.55, 29.75) },   // the booth's stairwell, in the lobby's corner from here (x, z)
@@ -352,12 +354,30 @@ for (const M of [THREE.MeshLambertMaterial, THREE.MeshPhongMaterial]) M.prototyp
       uniform vec3 uTvZoneP[9], uTvZoneC[9]; uniform highp sampler3D uTvVis; varying vec3 vTvPos;
       uniform vec4 uZone, uBoh, uFloorBox, uBohBox, uLobbyBox, uThBox; uniform vec3 uBohSplit; uniform vec4 uThLight, uTall; uniform vec2 uShaft; uniform vec4 uDeadL[3]; uniform vec3 uThScreenP; uniform float uThSconce;
       uniform vec4 uSpillP[8], uSpillC[8], uSpillB[8], uSpillD[8]; uniform int uSpillN;
-      uniform vec3 uInSky, uInGround, uInAmb, uInDirC, uInDir, uSunSky, uSunGround, uSunC, uSunDir, uMoonSky, uMoonGround, uMoonC, uMoonDir, uDayC, uNightC, uFogC; uniform float uFogD;`)
+      uniform vec3 uInSky, uInGround, uInAmb, uInDirC, uInDir, uSunSky, uSunGround, uSunC, uSunDir, uMoonSky, uMoonGround, uMoonC, uMoonDir, uDayC, uNightC, uFogC; uniform float uFogD, uFogCam;`)
     .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nfloat tvOut = 0.0;\n" + ROOM_FRAG + TV_FRAG)
     .replace("void main() {", TROFFER_GLSL + "\nvoid main() {")
     .replace("#include <fog_fragment>", `#include <fog_fragment>
-      if (tvOut > 0.5 && uFogD > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogC, 1.0 - exp(-length(vTvPos - cameraPosition) * uFogD));   // outdoors only: the fog's out there`);
+      if ((tvOut > 0.5 || uFogCam > 0.5) && uFogD > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogC, 1.0 - exp(-length(vTvPos - cameraPosition) * uFogD));   // outdoors only: the fog's out there`);
 };
+
+// the fog on what isn't lit by the room shader: signs, lenses, glass (Tony's shader does the same: tonys/light.js). uFogCam: you're out in it, so it's between you and everything, indoors through a window too; from indoors, only what's out there
+const FOG_OUT_GLSL = `bool fogOut(vec3 P) { bool store = ((P.x > -7.85 && P.x < 11.3 && P.z > -0.3 && P.z < 35.2) || (P.x > -7.85 && P.x < 2.2 && P.z > 35.0 && P.z < 48.7)) && P.y < 7.0, tony = P.x > 13.0 && P.x < 21.0 && P.z > 0.0 && P.z < 14.0 && P.y < 4.4; return !store && !tony; }`;
+THREE.MeshBasicMaterial.prototype.onBeforeCompile = function (sh) {
+  if (this.fog === false) return;                 // (the few that are meant to stand clear of it)
+  Object.assign(sh.uniforms, { uFogC: TVU.uFogC, uFogD: TVU.uFogD, uFogCam: TVU.uFogCam });
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vFogP;").replace("#include <project_vertex>", `#include <project_vertex>
+    { vec4 fw = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+      fw = instanceMatrix * fw;
+      #endif
+      vFogP = (modelMatrix * fw).xyz; }`);
+  const add = this.blending === THREE.AdditiveBlending;
+  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>\nvarying vec3 vFogP; uniform vec3 uFogC; uniform float uFogD, uFogCam;\n${FOG_OUT_GLSL}`).replace("#include <fog_fragment>", `#include <fog_fragment>
+    if (uFogD > 0.0 && (uFogCam > 0.5 || fogOut(vFogP))) { float ff = 1.0 - exp(-length(vFogP - cameraPosition) * uFogD);
+      ${add ? "gl_FragColor.rgb *= 1.0 - ff;" : "gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogC, ff); gl_FragColor.a = mix(gl_FragColor.a, 1.0, ff * smoothstep(0.0, 0.02, gl_FragColor.a));"} }`);
+};
+THREE.MeshBasicMaterial.prototype.customProgramCacheKey = function () { return `fogB${this.fog === false ? 0 : 1}${this.blending === THREE.AdditiveBlending ? 1 : 0}`; };
 
 // ---- what walls are made of. A surface's look, worked out where it is in the world (merged boxes have no texture coordinates to
 // speak of): one tiling noise picture made here at load, read twice a pixel, no image files. R: broad mottling, G: fine grain, B: long

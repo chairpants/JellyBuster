@@ -1,5 +1,5 @@
 // ---------------- player ----------------
-const player = { x: 0, z: 2.6, yaw: Math.PI, pitch: 0, r: 0.32, inBooth: false };   // (inBooth: up in the projection booth, its floor over the lobby's)
+const player = { x: 0, z: 2.6, yaw: Math.PI, pitch: 0, r: 0.32, inBooth: false, airH: 0 };   // (inBooth: up in the projection booth, its floor over the lobby's)
 let eyeY = 1.65;                            // eased toward standing/crouch height
 camera.position.set(player.x, 1.65, player.z);
 camera.rotation.y = player.yaw;
@@ -262,10 +262,8 @@ addEventListener("keydown", e => {
   if (shift.report) { if (["Enter", "Space", "KeyE"].includes(e.code) && !e.repeat) nextShift(); return; }   // the end-of-shift slip
   if (board.open) { if (document.pointerLockElement === canvas) boardKey(e); return; }   // arranging the staff's jobs
   if (e.code === "KeyK" && !e.repeat && document.pointerLockElement === canvas && !(CUSTOMER && cm.term)) { sheetToggle(); return; }   // the skills sheet (not at the register terminal: K takes the key there)
-  if (document.pointerLockElement !== canvas) {   // paused / title screen: only the window-level keys
-    if (e.code === "KeyF") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-    return;
-  }
+  if (document.pointerLockElement !== canvas) return;   // paused / title screen
+  if (WHEEL.open) { if (e.code === "Escape") wheelClose(); return; }   // the time and weather wheel's up
   if (siKey(e)) return;                          // at the Space Invaders machine: its controls
   if (CUSTOMER && cm.term && cmTermKey(e)) return;   // logged into the register (customer mode): its keys, not yours
   if (e.code === "Escape") { if (!escClose()) document.exitPointerLock(); return; }   // (only reaches us in fullscreen, with the keyboard lock)
@@ -291,6 +289,7 @@ addEventListener("keydown", e => {
   else if (WX_KIT_ON && !inv.length && /^Digit[1-9]$/.test(e.code)) wxKitSelect(+e.code[5] - 1);   // (WX_KIT: temporary)
   else if (CUSTOMER && /^Digit\d$/.test(e.code) && !e.repeat && cmComboKey(e.code[5])) {}   // at a padlock: the combination
   else if (/^Digit[1-9]$/.test(e.code)) invSelect(+e.code[5] - 1);   // pick an inventory slot
+  if (e.code === "Space" && !e.repeat) jumpStart();
   if (e.code === "KeyB" && !e.repeat) togglePause();
   if ((e.code === "KeyV" || e.code === "KeyN") && !e.repeat) mediaDown(e.code);   // the tape: a tap for the episode before / after, held to wind (see media)
   if (e.code === "KeyQ" && !e.repeat) coQ();
@@ -303,11 +302,12 @@ addEventListener("keydown", e => {
   if (e.code === "KeyL" && !e.repeat) skipHour();   // the store lights are real switches; L fast-forwards the clock
   if (e.code === "KeyH") document.body.classList.toggle("nohud");
   if (e.code === "KeyM" && !e.repeat && window.StoreAmbience) { const m = !StoreAmbience.muted(); StoreAmbience.setMuted(m); sfxRefresh(); toast(m ? "Store sounds off (M)" : "Store sounds on (M)", true); }
-  if (e.code === "KeyF") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  if (e.code === "KeyF" && !e.repeat) WHEEL.hold = setTimeout(() => { WHEEL.hold = null; wheelOpen(); }, 350);   // held: the time and weather wheel (a tap: nothing. Fullscreen is the browser's own F11)
 });
 addEventListener("keyup", e => {
   keys.delete(e.code);
   mediaUp(e.code);
+  if (e.code === "KeyF" && WHEEL.hold) { clearTimeout(WHEEL.hold); WHEEL.hold = null; }
   if (e.code === "KeyE") {
     clearTimeout(eHoldTimer); eHoldTimer = null;   // let go before it's lifted: nothing happens
     if (eHoldSwitch) { flipSwitch(eHoldSwitch); eHoldSwitch = null; }   // a tap on the plate: just the one switch
@@ -343,6 +343,7 @@ canvas.addEventListener("wheel", e => {          // lean in on the couch, or zoo
 });
 let lastActive = 0;                          // last mouse-look or key — the crosshair hides after a few still seconds
 addEventListener("mousemove", e => {
+  if (WHEEL.open && document.pointerLockElement === canvas) { wheelMouse(e.movementX, e.movementY); return; }
   if (document.pointerLockElement !== canvas || golf.on || arcade.on || fullVid.on) return;   // (golfing: the camera's the swing's; at the arcade machine, its screen; full screen on a tape: held still)
   if (mouseJumped(e.movementX, e.movementY)) return;   // (a move that never happened)
   lastActive = performance.now();
@@ -365,6 +366,7 @@ function blocked(x, z) {
   if (CUSTOMER ? outBlocked(x, z) : tonyBlocked(x, z)) return true;
   for (const c of colliders) if (!c.staff)       // (you walk through the staff: they can't pin you in a corner)
     if (x > c.x0 - player.r && x < c.x1 + player.r && z > c.z0 - player.r && z < c.z1 + player.r) {
+      if (c.y1 != null && player.airH >= c.y1 - 0.02) continue;   // (off the ground and over the top of it)
       if (c === frontWallBox && x > 0.05 + player.r && x < 1.75 - player.r && (!CUSTOMER || cmDoorOpen(player.z > 0))) continue;   // the right-hand door: customers' (when they're let in), and yours (you've the keys)
       return true;
     }
@@ -398,7 +400,42 @@ function outBlocked(x, z) {
   }
   return false;
 }
+// ---- the jump (Space): a person's, not a game character's. Up about 42 cm under real gravity, so about 0.6 s in the air; how far is whatever speed you left the
+// ground with (about 1.8 m from a walk, 3 m from a flat-out run), with next to no steering once you're up, and a moment to get your feet back when you land.
+// Nothing heavy in your arms. Feet over something low you clear it, or land on top of it (see groundUnder) ----
+const JUMP = { g: 9.81, h: 0.42, airControl: 1.2, recover: 0.22 };
+const jump = { air: false, v: 0, vx: 0, vz: 0, recover: 0, dip: 0 };
+const jumpHeavy = () => stool.carried || cutout.carried || ladder.state === "carried" || boxCarry.length || bagCarry.length || toolHeld || cmove.item;
+function jumpStart() {
+  if (jump.air || jump.recover > 0 || seated || onStool || ladder.on || roof.climb || inspecting || scrub || drunk.out || golf.on || jumpHeavy()) return false;
+  const h = JUMP.h * (1 + 0.02 * (lv("you", "con") - 1)) * (hungover() ? 0.6 : 1) * (keys.has("KeyC") ? 0.75 : 1);   // (CON: a little more spring; a hangover: a lot less; from a crouch you've not got your legs under you)
+  jump.air = true; jump.v = Math.sqrt(2 * JUMP.g * h); return true;
+}
+function groundUnder(x, z) {                     // what you'd land on: the floor, or the top of something low you've got your feet over
+  if (player.onRoof || player.inBooth) return 0;
+  let g = 0; const r = 0.12;
+  for (const c of colliders) if (c.y1 != null && c.y1 > g && c.y1 <= player.airH + 0.03 && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) g = c.y1;
+  return g;
+}
+function jumpTick(dt) {                          // up and down, and on at the speed you left the ground; -> whether you're off it
+  if (jump.recover > 0) jump.recover -= dt;
+  jump.dip = Math.max(0, jump.dip - dt * 0.55);
+  if (!jump.air && !player.airH) return false;
+  const under = groundUnder(player.x, player.z);
+  if (!jump.air && player.airH > under + 0.01) { jump.air = true; jump.v = 0; }   // walked off the edge of it
+  if (!jump.air) { player.airH = under; return false; }
+  player.airH += jump.v * dt; jump.v -= JUMP.g * dt;
+  if (blocked(player.x + jump.vx * dt, player.z)) jump.vx = 0; else player.x += jump.vx * dt;
+  if (blocked(player.x, player.z + jump.vz * dt)) jump.vz = 0; else player.z += jump.vz * dt;
+  const land = groundUnder(player.x, player.z);
+  if (jump.v < 0 && player.airH <= land) {
+    jump.dip = Math.min(0.11, -jump.v * 0.035); player.airH = land; jump.air = false; jump.recover = JUMP.recover;   // the knees take it
+    ambStep(player.x, player.z, Math.min(1, 0.45 - jump.v * 0.12));
+  }
+  return jump.air;
+}
 function move(dt) {
+  if (seated || onStool || ladder.on || roof.climb) { player.airH = 0; jump.air = false; jump.vx = jump.vz = 0; }
   const f = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const rt = new THREE.Vector3(-f.z, 0, f.x);
   let ix = 0, iz = 0;
@@ -411,16 +448,22 @@ function move(dt) {
     if (!ladder.fix && ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].some(k => keys.has(k))) ladderDown();
     return;
   }
+  const airborne = jumpTick(dt);
   if (seated || inspecting || scrub || drunk.out || golf.on) return;   // stand up with E first; (scrubbing: you stay put till it's done)
   if (keys.has("KeyW") || keys.has("ArrowUp")) iz += 1;
   if (keys.has("KeyS") || keys.has("ArrowDown")) iz -= 1;
   if (keys.has("KeyD") || keys.has("ArrowRight")) ix += 1;
   if (keys.has("KeyA") || keys.has("ArrowLeft")) ix -= 1;
-  if (!ix && !iz) return;
+  if (airborne) {                                // a little give in the air, no more: you go where you jumped
+    if (ix || iz) { const L = Math.hypot(ix, iz), k = JUMP.airControl * dt / L; jump.vx += (f.x * iz + rt.x * ix) * k; jump.vz += (f.z * iz + rt.z * ix) * k; }
+    return;
+  }
+  if (!ix && !iz) { jump.vx = jump.vz = 0; return; }
   const sp = ((keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 5.2 * (has("you", "con", 5) ? 1.15 : 1) : 3.1) * (1 + 0.02 * (lv("you", "con") - 1));   // (CON: quicker on your feet; Second Wind)
   const crouched = keys.has("KeyC");
-  const spd = sp * (crouched ? 0.55 : 1) * (hungover() ? 0.75 : 1);
+  const spd = sp * (crouched ? 0.55 : 1) * (hungover() ? 0.75 : 1) * (jump.recover > 0 ? 0.6 : 1);
   const dx = (f.x * iz + rt.x * ix) * spd * dt, dz = (f.z * iz + rt.z * ix) * spd * dt;
+  jump.vx = dx / dt; jump.vz = dz / dt;           // (what you'd take off with)
   const x0 = player.x, z0 = player.z, top = !player.inBooth && floorHeightAt(x0, z0) > TALL.booth - 0.1;
   const stuck = blocked(x0, z0);                 // (somewhere you can't be, however you got there: any way out goes)
   if (stuck || !blocked(player.x + dx, player.z)) player.x += dx;
@@ -431,7 +474,10 @@ function move(dt) {
   if ((playerStepD += walked) > (sp > 4 ? 0.95 : 0.72)) { playerStepD = 0; ambStep(player.x, player.z, crouched ? 0.35 : 0.6); }   // your own, quieter (you're wearing sneakers)
 }
 let playerStepD = 0, walkXp = 0;
-const ambStep = (x, z, w) => window.StoreAmbience?.step(x, z, z < 4.35 || (z > STORE.z && x > BOH.x0 && z < BOH.z1), w);   // tile at the front and in back of house; carpet elsewhere
+function ambStep(x, z, w) {                      // tile at the front and in back of house; carpet elsewhere; outdoors, paving, and whatever the weather's left on it
+  const out = !player.inBooth && (player.onRoof || !(inBuilding(x, z) || tonyIn(x, z)));
+  window.StoreAmbience?.step(x, z, out || z < 4.35 || (z > STORE.z && x > BOH.x0 && z < BOH.z1), w, !out ? null : WX.cover > 0.18 ? "snow" : WX.wet > 0.22 ? "wet" : null);
+}
 
 // ---------------- picking / inspecting ----------------
 const raycaster = new THREE.Raycaster();
@@ -446,7 +492,7 @@ const highlight = new THREE.LineSegments(
   new THREE.LineBasicMaterial({ color: YELLOW }));
 highlight.visible = false;                 // turned per tape to match its shelf (tape.ry)
 scene.add(highlight);
-let aimStool = false, aimPickup = null, aimTony = null, aimBed = false, aimFireExit = null;          // aimPickup: something to find (customer mode: see PICKUPS)
+let aimStool = false, aimPickup = null, aimTony = null, aimBed = false, aimFireExit = null, aimExitDoor = null;          // aimPickup: something to find (customer mode: see PICKUPS)
 let aimPostit = null, aimNotepad = false;          // a post-it by the phone / the pad by the register
 let hovered = null, held = null, heldSnack = null, aimTV = false, aimLamp = null, aimCouch = false, aimReturns = false, aimSnack = null, aimFlap = null, aimCooler = false, aimPop = null, aimTrash = false, aimDoor = null, aimPOS = false, aimSlot = false, aimRewinder = null, aimBell = false, aimDesens = false, aimCutout = false, aimCustomer = false, aimLock = false, aimEmp = false, aimSwitch = null, aimDrawer = false, aimSeatObj = null, aimExit = false, aimPrinter = false, aimStockSlot = null, aimCupboard = null, aimBox = null, aimMess = null, aimStray = null, aimPhone = false, aimHolds = false, aimBoard = false, aimMove = null, aimToilet = false, aimSink = false, aimTowels = false, aimBin = null, aimBag = null, aimChute = false, aimTool = null, aimDead = null, aimLadder = false, aimLadderHome = false;   // aimSeatObj: the theater seat aimed at (null = a couch cushion)
 let returnBin = [];                          // tapes dropped in the returns slot — carry-only, never auto-reshelved

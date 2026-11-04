@@ -95,6 +95,7 @@ Three save files, like an old cartridge: pick one to **play**, **copy** or **del
 | **Mouse** | Look |
 | **Shift** | Hustle |
 | **C** | Crouch |
+| **Space** | Jump: a realistic hop, further with a run-up. Not with your arms full |
 | **Click** a tape | Pick it up and hold it up to look at it |
 | **Click** again | Tuck it in your hand |
 | **Right-click** | Put back a tape you're still looking at (straight off the shelf or out of Returns) · put down an untouched snack |
@@ -105,8 +106,9 @@ Three save files, like an old cartridge: pick one to **play**, **copy** or **del
 | **Mouse wheel** | Zoom while seated · otherwise switch the item in hand when carrying several |
 | **1–9** | Pick an inventory slot (carry up to 9 items; the bar appears once you hold 2+) |
 | **B** | Play or pause the tape in the TV |
-| **V / N** | Tap for the previous / next episode. Hold to rewind / fast-forward, with a scrub bar in the corner showing where you are |
+| **V / N** | Double-tap for the previous / next episode. Hold to rewind / fast-forward, with a scrub bar in the corner showing where you are |
 | **K** | Character sheet: your skills and the staff's, with XP toward the next level |
+| **F** | Hold for the time and weather wheel: aim with the mouse, click to choose, right-click or Esc to cancel |
 | **H** | Hide the HUD |
 | **M** | Store sounds on/off (fluorescent hum, air, traffic outside, the door chime, footsteps, doors, the cooler) |
 | **J** | Show or hide the log (bottom left) · **PgUp / PgDn** scroll it |

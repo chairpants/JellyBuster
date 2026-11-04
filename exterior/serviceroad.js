@@ -143,7 +143,7 @@ function buildServiceRoad({ lam, ext }) {
     for (const f of SR.fences) shade(ctx, f, 0.85, 0.38);
     for (const w of [[[-9.4, 48.6], [-7.84, 48.6], [2.1, 48.6], [2.1, 35.1], [11.1, 35.1], [11.1, 0]], [[13, 0], [13, 14], [21, 14]]]) shade(ctx, w, 1.05, 0.5);
     blot(ctx, 12.72, 28.72, 1.75, "6,6,8", 0.7, 1.02, 0.72); blot(ctx, 15.45, 15, 1.7, "6,6,8", 0.55, 1.02, 0.72);
-    blot(ctx, 12.05, 26.75, 1.4, "16,14,12", 0.35, 0.82, 1.22);   // (years of somebody lying here)
+    blot(ctx, 12.05, 24.6, 1.4, "16,14,12", 0.35, 0.82, 1.22);   // (years of somebody lying here)
     // grit and rotted leaves against the fence and walls, drifted where the trucks don't sweep them
     for (const f of SR.fences) for (let i = 1; i < f.length; i++) { const [ax, az] = f[i - 1], [bx, bz] = f[i], L = Math.hypot(bx - ax, bz - az); for (let t = 0; t < L; t += rr(0.1, 0.5)) { ctx.fillStyle = `rgba(${pick(["64,50,32", "92,76,48", "44,36,24"])},${rr(0.2, 0.55)})`; ctx.beginPath(); ctx.ellipse(ax + (bx - ax) * t / L + rr(-0.42, 0.42), az + (bz - az) * t / L + rr(-0.42, 0.42), rr(0.02, 0.12), rr(0.015, 0.07), R() * 3, 0, 7); ctx.fill(); } }
   }, TW, TH);
@@ -323,9 +323,10 @@ function buildServiceRoad({ lam, ext }) {
     for (let i = 0; i < 90; i++) { const a = r5() * Math.PI / 2, d = IS.r + jit(0.32); spots.push([IS.x + Math.cos(a) * d, IS.z + Math.sin(a) * d, 0.1 + r5() * 0.26]); }   // the island's edge
     for (let i = 0; i < 90; i++) spots.push([-11.84 + jit(0.4), r5() * 41, 0.1 + r5() * 0.2]);   // along the west lane's soft side
     for (let i = 0; i < 60; i++) spots.push([23 + jit(0.4), r5() * 18, 0.1 + r5() * 0.2]);     // and the east's
-    for (let i = 0; i < 26; i++) spots.push([11.2 + r5() * 2.2, 25 + r5() * 3, 0.1 + r5() * 0.18]);   // round the bed
-    const tufts = new THREE.InstancedMesh(tgeo, tuftM, spots.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
-    spots.forEach(([x, z, s], i) => { tufts.setMatrixAt(i, M.compose(V.set(x, 0.004, z), Q.setFromAxisAngle(Y, r5() * 6.28), S.set(s * 0.8, s, s * 0.8))); tufts.setColorAt(i, c.setRGB(0.82 + r5() * 0.5, 0.86 + r5() * 0.4, 0.62 + r5() * 0.42)); });
+    for (let i = 0; i < 26; i++) spots.push([11.2 + r5() * 2.2, 22.9 + r5() * 3.2, 0.1 + r5() * 0.18]);   // round the bed
+    const outdoors = spots.filter(([x, z]) => !inBuilding(x, z, 0.1) && !(x > 12.9 && x < 21.1 && z > -0.1 && z < 14.1));   // (the cracks wander past the road's edge on paper: nothing grows up through a floor)
+    const tufts = new THREE.InstancedMesh(tgeo, tuftM, outdoors.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
+    outdoors.forEach(([x, z, s], i) => { tufts.setMatrixAt(i, M.compose(V.set(x, 0.004, z), Q.setFromAxisAngle(Y, r5() * 6.28), S.set(s * 0.8, s, s * 0.8))); tufts.setColorAt(i, c.setRGB(0.82 + r5() * 0.5, 0.86 + r5() * 0.4, 0.62 + r5() * 0.42)); });
     tufts.instanceMatrix.needsUpdate = true; tufts.instanceColor.needsUpdate = true; g.add(tufts);
   }
 

@@ -25,7 +25,7 @@ function roofY(x, z) {                          // underfoot up top: the store's
   if (x > IRON.land && x < foot && z > IRON.z0 && z < ROOF.tall.z0) return x <= IRON.x0 ? ROOF.tall.y : ROOF.y + (foot - x) / (foot - IRON.x0) * (ROOF.tall.y - ROOF.y);
   return deckY(x, z) ?? ROOF.y;
 }
-const playerFloor = () => player.onRoof ? roofY(player.x, player.z) : player.inBooth ? TALL.booth : floorHeightAt(player.x, player.z);
+const playerFloor = () => (player.airH || 0) + (player.onRoof ? roofY(player.x, player.z) : player.inBooth ? TALL.booth : floorHeightAt(player.x, player.z));   // (airH: off the ground, see jumpTick)
 const roofHandsFull = () => stool.carried || cutout.carried || ladder.state === "carried" || boxCarry.length || bagCarry.length || toolHeld || cmove.item;
 {
   const Y = ROOF.y, G = roof.g, T = 0.2, PH = ROOF.wall;
@@ -87,7 +87,7 @@ const roofHandsFull = () => stool.carried || cutout.carried || ladder.state === 
   const skin = new THREE.Group(); scene.add(skin);   // (the building's outside, in the scene not the roof group: seen from up here over the edge, and from anywhere out there)
   // each edge: from, to, its deck's height, how far down its skin goes (to the ground, or the store's roof under the tall
   // block's front and side), and whether it has a parapet (the tall front's gap over the stair: just the wall under it)
-  const EDGES = [[-7.84, -0.1, 11.1, -0.1, Y, 0], [11.1, -0.1, 11.1, 35.1, Y, 0], [11.1, 35.1, TX1, 35.1, Y, 0], [-7.84, TZ0, -7.84, -0.1, Y, 0],
+  const EDGES = [[-7.84, -0.1, 11.1, -0.1, Y, 0], [11.1, -0.1, 11.1, STORE_EXIT.z0, Y, 0, true, "b"], [11.1, STORE_EXIT.z0, 11.1, STORE_EXIT.z1, Y, DOOR_H], [11.1, STORE_EXIT.z1, 11.1, 35.1, Y, 0, true, "a"], [11.1, 35.1, TX1, 35.1, Y, 0], [-7.84, TZ0, -7.84, -0.1, Y, 0],
     [TX0, TZ0, IRON.land, TZ0, TY, Y], [IRON.land, TZ0, IRON.x0, TZ0, TY, Y, false], [IRON.x0, TZ0, TX1, TZ0, TY, Y], [TX1, TZ0, TX1, 35.1, TY, Y],
     [TX1, 35.1, TX1, TZ1, TY, 0], [TX1, TZ1, TX0, TZ1, TY, 0],
     [TX0, TZ1, TX0, FIRE_EXIT.z1, TY, 0, true, "b"], [TX0, FIRE_EXIT.z1, TX0, FIRE_EXIT.z0, TY, FIRE_EXIT.head], [TX0, FIRE_EXIT.z0, TX0, TZ0, TY, 0, true, "a"]];   // (over the emergency exit: from its head up; either side of it, the skin stops at its opening)

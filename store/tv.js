@@ -111,10 +111,10 @@ function togglePause() {
 }
 function stepEpisode(d) { if (playing) playEpisode(playing.idx + d, playing.tape); }
 video.addEventListener("ended", () => stepEpisode(1));
-// ---- V and N: a tap's the episode before / after (V on the first, back to its start); held, they wind through this one, the picture
+// ---- V and N: a double tap's the episode before / after (V on the first, back to its start: one tap alone just asks, so a slip of the finger doesn't change the tape); held, they wind through this one, the picture
 // held still and jumping along behind, faster the longer you hold, with a bar in the corner to say where you've got to. B: play / pause ----
-const SCRUB_AFTER = 300;                        // ms: longer than a tap
-const media = { key: null, dir: 0, down: 0, on: false, t: 0, was: false, seekAt: 0, last: 0, barTill: 0, shown: "" };
+const SCRUB_AFTER = 300, DOUBLE_TAP = 450;      // ms: longer than a tap; how soon the second tap has to come
+const media = { key: null, dir: 0, down: 0, on: false, t: 0, was: false, seekAt: 0, last: 0, barTill: 0, shown: "", tapKey: null, tapAt: 0 };
 const scrubClock = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, c = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(m).padStart(2, "0")}:${c}` : `${m}:${c}`; };
 function mediaDown(code) {
   if (!playing || !video.src) return;
@@ -126,6 +126,9 @@ function mediaUp(code) {
   const { dir, on } = media; media.key = null;
   if (on) { mediaScrubEnd(); return; }
   if (!playing) return;
+  const now = performance.now(), second = media.tapKey === code && now - media.tapAt < DOUBLE_TAP;
+  media.tapKey = second ? null : code; media.tapAt = now;
+  if (!second) { tvOsd(dir < 0 ? "V AGAIN: PREVIOUS" : "N AGAIN: NEXT", DOUBLE_TAP / 1000 + 0.3); return; }
   const eps = playing.eps.length, to = playing.idx + dir;
   if (to >= eps) tvOsd("LAST ON THIS TAPE", 2);
   else if (to < 0) { if (isFinite(video.duration)) video.currentTime = 0; tvOsd("◀◀ START", 2); }
@@ -181,6 +184,7 @@ function hearLinks() {                           // [room, room, x, z (the way t
     ["theater", "booth", -3, TALL.z1, 0.35, 5000],
     ["theater", "out", WALL_L - 0.1, (FIRE_EXIT.z0 + FIRE_EXIT.z1) / 2, ...door(fireExit.a > 0, 0.6, 0.012)],
     ["store", "out", 0.9, -0.1, ...door(frontDoor.k > 0.05, 0.3, 0.03)],   // (the storefront's glass, or its door standing open)
+    ["store", "out", STORE.x + 0.1, (STORE_EXIT.z0 + STORE_EXIT.z1) / 2, ...door(storeExit.a > 0, 0.6, 0.012)],
     ["store", "roof", 2, 14, 0.006, 260],
     ["roof", "out", ...(roof.cine ? [roof.cine.sound.getWorldPosition(tvHearV).x, tvHearV.z] : [0, 0]), 0.3, 2600],   // (open air, but a parapet in the way)
     ["out", "tony", 17, 0, 0.08, 600]];
@@ -286,7 +290,7 @@ function onE() {
   if (aimHolds && !held) { holdPull(); return; }
   if (aimCustomer) { custInteract(aimCustomer); return; }
   if (aimSwitch) { flipSwitch(aimSwitch); return; }
-  if (aimFireExit) { fireExitUse(aimFireExit); return; }
+  if (aimFireExit) { fireExitUse(aimFireExit, aimExitDoor); return; }
   if (aimEmp && afterClose() && !aimEmp.leaving && aimEmp.state !== "toExit") { sendHome(aimEmp); return; }   // closed: off you go
   if (aimEmp && aimEmp.state === "stoolSit") {   // they're on the stool: a shove, same as your own spins (keep it up and they get dizzy)
     stoolPush(); aimEmp.bored = 0; aimEmp.c.lookAt(null); aimEmp.c.setMood(aimEmp.dizzy > 0.5 ? "meh" : "love"); return;

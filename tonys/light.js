@@ -28,7 +28,7 @@ const tonyU = {
   uTSun: { value: new THREE.Vector3() }, uTSunC: { value: new THREE.Color() },
   uTNoise: { value: wallNoise }, uTOn: { value: 1 },
 };
-for (const k of ["uSunSky", "uSunGround", "uSunC", "uSunDir", "uMoonSky", "uMoonGround", "uMoonC", "uMoonDir", "uZone"]) tonyU[k] = TVU[k];
+for (const k of ["uSunSky", "uSunGround", "uSunC", "uSunDir", "uMoonSky", "uMoonGround", "uMoonC", "uMoonDir", "uZone", "uFogC", "uFogD", "uFogCam"]) tonyU[k] = TVU[k];
 const TONY_VERT = `
   attribute vec2 aM; varying vec3 vP, vN, vC; varying vec2 vM, vUv;
   #ifndef NOVCOL
@@ -45,7 +45,8 @@ const TONY_VERT = `
   }`;
 const TONY_FRAG = `
   uniform vec4 uTL[${TONY_LIGHTS.length}]; uniform vec3 uTC[${TONY_LIGHTS.length}]; uniform vec2 uTK[${TONY_LIGHTS.length}];
-  uniform vec3 uTAmb, uTSun, uTSunC, uColor; uniform sampler2D uTNoise; uniform float uTOn;
+  uniform vec3 uTAmb, uTSun, uTSunC, uColor, uFogC; uniform sampler2D uTNoise; uniform float uTOn, uFogD, uFogCam;
+  ${FOG_OUT_GLSL}
   uniform vec3 uSunSky, uSunGround, uSunC, uSunDir, uMoonSky, uMoonGround, uMoonC, uMoonDir; uniform vec4 uZone;
   #ifdef USE_MAP
   uniform sampler2D uMap;
@@ -167,6 +168,7 @@ const TONY_FRAG = `
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
+    if (uFogD > 0.0 && (uFogCam > 0.5 || fogOut(vP))) gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogC, 1.0 - exp(-length(vP - cameraPosition) * uFogD));
   }`;
 const tonyMats = new Map();
 function tonyLit({ kind = "", map = null, color = 0xffffff, side = THREE.FrontSide } = {}) {   // kinds: FLOOR, WALL, CEIL, BRICK, PAD, LEAF (those read no vertex colors); none: the kit's

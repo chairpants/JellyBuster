@@ -457,7 +457,7 @@ const WALL_RUNS = [
   { x: WALL_L + 0.1, z: 8.1, ry: 0, bays: 12 },                     // register (Movies) wall, front → back, just past the snack center
   { x: WALL_L + 0.1 + BAY.depth, z: STORE.z - 0.1, ry: Math.PI / 2, bays: 2 },   // back wall, left of the lounge
   { x: BOH_DOORS.store + BOH_OPENING_W / 2 + 0.01, z: STORE.z - 0.1, ry: Math.PI / 2, bays: 2 },   // back wall, past the back-hall opening beside the lounge
-  { x: STORE.x - 0.1, z: 26.8, ry: Math.PI, bays: 11 },             // far wall, back → front, stopping short of the opening and the kids section
+  { x: STORE.x - 0.1, z: STORE_EXIT.z0 - 0.3, ry: Math.PI, bays: 11 },   // far wall, back → front, from just this side of the emergency exit, stopping short of the kids section
 ];
 const CENTER = { corridor: 1.5, westBays: 2, eastBays: 4, z0: 8.6, gap: 2.0, bands: 4 };   // corridor = half-width of the door→lounge walkway; z0 = front band's door-side face
 const KIDS = { bandX: [4.75, 8.15], z0: 1.1, bays: 4, x0: 1.95, x1: STORE.x - 0.1, z1: 8.3 };   // bandX = each band's center plane; x0..x1/z0..z1 = the carpet

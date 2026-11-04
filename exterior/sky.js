@@ -57,23 +57,36 @@ const wxFall = (() => {                           // the rain (streaks) and the 
       return p;
     }
     bool indoors(vec3 p) { return ${foot}; }
+    // where it's coming down heavier or lighter right now: curtains drifting across, thickening and thinning, the whole lot easing in and out over minutes
+    float veil(vec2 p) { float a = sin(p.x * 0.17 + uT * 0.23 + 1.7 * sin(p.y * 0.09 - uT * 0.11)), b = sin(p.y * 0.31 - uT * 0.37 + 1.3 * sin(p.x * 0.23 + uT * 0.19));
+      return clamp(0.5 + 0.32 * a + 0.22 * b, 0.0, 1.0) * (0.68 + 0.32 * sin(uT * 0.083 + 1.0) * sin(uT * 0.047)) + 0.1; }
+    float rc(vec2 p, vec4 r) { return smoothstep(0.0, 1.2, min(min(p.x - r.x, r.y - p.x), min(p.y - r.z, r.w - p.y))); }
+    float lee(vec3 p) {                              // how shut in by buildings: the gap and the alley between the store and Tony's, the crook behind the store. Up over the roofs, the wind has it again
+      return max(max(rc(p.xz, vec4(11.1, 18.0, 14.0, 35.0)), rc(p.xz, vec4(11.1, 13.0, -0.5, 14.5))), rc(p.xz, vec4(2.1, 11.1, 35.1, 41.0))) * (1.0 - smoothstep(4.5, 6.5, p.y)); }
     `;
   const OFF = "gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return;";
   const rainMat = u => new THREE.ShaderMaterial({ uniforms: u, transparent: true, depthWrite: false,
-    vertexShader: head + `varying float vE;
+    vertexShader: head + `varying float vE, vA;
       void main() { float sp = 9.0 + seed * 3.0; vec3 p = place(position, uT * sp, uDrift); if (indoors(p)) { ${OFF} }
-        p += end * 0.45 * vec3(-uWind.x / sp, 1.0, -uWind.y / sp); vE = end;   // the tail: where it was a moment ago, up and upwind
+        float v = veil(p.xz), wind = clamp(length(uWind) / 4.0, 0.0, 1.0);
+        if (seed > v * (1.0 - 0.5 * wind * lee(p)) + 0.05) { ${OFF} }   // (what isn't falling here costs nothing to draw)
+        p += end * (0.28 + 0.34 * seed) * vec3(-uWind.x / sp, 1.0, -uWind.y / sp); vE = end; vA = 0.5 + 0.5 * v;   // the tail: where it was a moment ago, up and upwind
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `uniform float uK, uNight; varying float vE; void main() { gl_FragColor = vec4(vec3(0.78, 0.82, 0.9) * (1.0 - 0.55 * uNight), (0.12 + 0.3 * vE) * uK); }` });
+    fragmentShader: `uniform float uK, uNight; varying float vE, vA; void main() { gl_FragColor = vec4(vec3(0.78, 0.82, 0.9) * (1.0 - 0.55 * uNight), (0.045 + 0.17 * vE) * uK * vA); }` });
   const snowMat = u => new THREE.ShaderMaterial({ uniforms: u, transparent: true, depthWrite: false,
-    vertexShader: head + `varying float vS;
-      void main() { float t = uT * (0.7 + seed * 0.5); vec3 p = place(position, t, uDrift * (0.8 + seed * 0.4));
-        p.x += sin(t * 0.9 + seed * 40.0) * 0.35; p.z += cos(t * 0.7 + seed * 30.0) * 0.25; vS = seed;
+    vertexShader: head + `varying float vS, vA;
+      void main() { float t = uT * (0.7 + seed * 0.5), wind = clamp(length(uWind) / 4.0, 0.0, 1.0); vec3 p; float a;
+        if (seed < 0.3) {                              // a third of it only ever falls in the shelter of the buildings: slow, nearly straight down, wandering, whatever it's doing out in the open
+          p = place(position, t * 0.8, uDrift * 0.05 + vec2(sin(uT * 0.13 + seed * 90.0), cos(uT * 0.11 + seed * 50.0)) * 0.7); a = lee(p); if (a < 0.02) { ${OFF} }
+        } else {                                       // the rest is out in the wind, which doesn't turn the corner: the harder it blows the less of it gets in
+          p = place(position, t, uDrift * (0.8 + seed * 0.4)); float v = veil(p.xz); a = (1.0 - lee(p) * (0.45 + 0.53 * wind)) * (0.4 + 0.6 * v); if (fract(seed * 7.3) > a + 0.08) { ${OFF} }
+        }
+        p.x += sin(t * 0.9 + seed * 40.0) * 0.35; p.z += cos(t * 0.7 + seed * 30.0) * 0.25; vS = seed; vA = min(1.0, a * 1.4);
         if (indoors(p)) { ${OFF} }
-        vec4 mv = viewMatrix * vec4(p, 1.0); gl_PointSize = clamp((2.0 + seed * 3.0) * 40.0 / -mv.z, 1.0, 7.0); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform float uK, uNight; varying float vS; void main() { vec2 d = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.2, length(d)); gl_FragColor = vec4(vec3(1.0) * (1.0 - 0.5 * uNight), a * 0.85 * uK); }` });
-  const rain = new THREE.LineSegments(mk(4500, true), rainMat(box(...FAR))), rainNear = new THREE.LineSegments(mk(16000, true), rainMat(box(...NEAR)));
-  const snow = new THREE.Points(mk(3500, false), snowMat(box(...FAR))), snowNear = new THREE.Points(mk(9000, false), snowMat(box(...NEAR)));
+        vec4 mv = viewMatrix * vec4(p, 1.0); gl_PointSize = clamp((2.0 + seed * 3.0) * (fract(seed * 13.7) > 0.93 ? 1.7 : 1.0) * 40.0 / -mv.z, 1.0, 9.0); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform float uK, uNight; varying float vS, vA; void main() { vec2 d = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.2, length(d)); gl_FragColor = vec4(vec3(1.0) * (1.0 - 0.5 * uNight), a * 0.85 * uK * vA); }` });
+  const rain = new THREE.LineSegments(mk(2800, true), rainMat(box(...FAR))), rainNear = new THREE.LineSegments(mk(9500, true), rainMat(box(...NEAR)));
+  const snow = new THREE.Points(mk(2600, false), snowMat(box(...FAR))), snowNear = new THREE.Points(mk(7000, false), snowMat(box(...NEAR)));
   for (const o of [rain, rainNear, snow, snowNear]) { o.layers.set(EXTERIOR_LAYER); o.frustumCulled = false; o.renderOrder = -1; o.visible = false;   // (-1: always drawn before the storefront glass, which writes depth; sorted by their origin they lost to it looking along the windows)
     scene.add(o); }
   return { rain, rainNear, snow, snowNear, uni };
@@ -196,15 +209,20 @@ const wxSky = (() => {
         float sd = dot(d, uSun);
         col += uSunC * uSunUp * (smoothstep(0.99955, 0.99975, sd) * 8.0 + pow(max(sd, 0.0), 350.0) * 0.9 + pow(max(sd, 0.0), 10.0) * 0.12);
         if (uStar > 0.003) {
-          vec3 sc = vec3(0.0);
-          for (int l = 0; l < 2; l++) {                                            // a fine field of faint ones, a few bright ones
-            float fl = float(l), sz = l == 0 ? 160.0 : 64.0, thr = l == 0 ? 0.986 : 0.994;
+          vec3 sc = vec3(0.0), gal = normalize(vec3(0.38, 0.5, 0.78));              // the band of the galaxy, a slant across the sky
+          float gd = dot(d, gal), band = exp(-gd * gd * 22.0), gm = 0.55 + 0.25 * sin(d.x * 19.0 + d.y * 7.0 + 1.3) * sin(d.z * 23.0 - d.y * 11.0) + 0.2 * sin(d.x * 47.0 - d.z * 41.0);
+          col += vec3(0.1, 0.115, 0.17) * band * gm * uStar * smoothstep(0.02, 0.4, e);
+          for (int l = 0; l < 3; l++) {                                            // star dust, thicker in the band; a fine field; a few bright ones
+            float fl = float(l), sz = l == 0 ? 270.0 : l == 1 ? 160.0 : 64.0, thr = l == 0 ? 0.992 - 0.05 * band * gm : l == 1 ? 0.986 : 0.994;
             vec3 p = d * sz, c = floor(p); float hh = h3(c + fl * 17.0);
             if (hh > thr) {
               vec3 o = vec3(h3(c + 1.3), h3(c + 2.7), h3(c + 5.1)) - 0.5;
-              float b = smoothstep(l == 0 ? 0.24 : 0.3, 0.0, length(p - c - 0.5 - o * 0.45)) * (0.35 + 0.65 * (hh - thr) / (1.0 - thr)) * (l == 0 ? 0.9 : 2.2);
-              b *= 0.55 + 0.45 * sin(uT * (1.3 + 4.5 * h3(c + 9.2)) + 6.283 * h3(c + 3.3));   // twinkling, each at its own rate
-              sc += b * mix(vec3(0.72, 0.84, 1.0), vec3(1.0, 0.86, 0.68), h3(c + 7.7));
+              float pick = h3(c + 7.7), mag = (hh - thr) / (1.0 - thr), b = smoothstep(l == 0 ? 0.2 : l == 1 ? 0.24 : 0.3, 0.0, length(p - c - 0.5 - o * 0.45)) * (0.3 + 0.7 * mag * mag) * (l == 0 ? 0.4 : l == 1 ? 0.9 : 2.3);
+              bool planet = l == 2 && pick > 0.965;                                // the odd one that doesn't twinkle: bigger, steady, warm
+              if (!planet) b *= 0.58 + 0.42 * sin(uT * (0.8 + 5.0 * h3(c + 9.2)) + 6.283 * h3(c + 3.3));   // twinkling, each at its own rate
+              else b *= 1.5;
+              vec3 tint = planet ? vec3(1.0, 0.92, 0.74) : pick < 0.28 ? vec3(0.66, 0.78, 1.0) : pick < 0.62 ? vec3(0.95, 0.96, 1.0) : pick < 0.82 ? vec3(1.0, 0.93, 0.78) : pick < 0.95 ? vec3(1.0, 0.76, 0.52) : vec3(1.0, 0.56, 0.42);   // blue-white, white, yellow, orange, the odd red giant
+              sc += b * tint;
             }
           }
           col += sc * 1.7 * uStar * smoothstep(0.02, 0.3, e);
@@ -291,10 +309,11 @@ function wxKitRender() {
   wxKit.el.innerHTML = WX_KIT.map(([icon, name], i) => `<div style="width:66px;height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#00000060;border:3px solid ${i === wxKit.sel ? "var(--bb-yellow)" : "#ffffff40"};border-radius:4px;transform:translateY(${i === wxKit.sel ? -4 : 0}px);font:bold 10px Arial;color:#fff"><span style="font-size:24px">${icon}</span>${i + 1} ${name}</div>`).join("");
 }
 function wxKitSelect(i) { wxKit.sel = wxKit.sel === i ? -1 : i; wxKitRender(); }
-function wxKitUse() {
-  const [, name, kind, k, wet, cover, sky] = WX_KIT[wxKit.sel];
+function wxKitUse() { const [, name, kind, k, wet, cover, sky] = WX_KIT[wxKit.sel]; wxSetNow(name, kind, k, wet, cover, sky); }
+function wxSetNow(name, kind, k, wet, cover, sky) {   // this weather for the rest of the day, straight to full (the ground already soaked / snowed over: see the wheel)
   const plan = WX.plan = { ...wxPlan(), kind, from: 0, to: 25, k, fogAll: 0, ...sky };
   Object.assign(WX, { kind: kind === "clear" ? WX.kind : kind, k, wet, cover, fog: plan.fogAll, clouds: plan.clouds, wind: plan.wind });
+  SERVICE_ROAD.fx.pond.value = wet;
   toast(`Weather: ${name}`, true);
 }
 if (WX_KIT_ON) wxKitRender();
@@ -320,7 +339,9 @@ function weatherTick(dt) {
   const gt = F.uni.uT.value, gn = 0.5 + 0.25 * Math.sin(gt * 0.31) + 0.15 * Math.sin(gt * 0.83 + 1.3) + 0.1 * Math.sin(gt * 2.1 + 2.1);
   WX.gust = Math.min(1, WX.wind * Math.max(0, gn - 0.35) * 2.2);
   const wv = WX.wind * 5 + WX.gust * 4; F.uni.uWind.value.set(Math.cos(plan.windDir) * wv, Math.sin(plan.windDir) * wv); F.uni.uDrift.value.addScaledVector(F.uni.uWind.value, dt);
-  F.rain.visible = F.rainNear.visible = raining > 0.01; F.snow.visible = F.snowNear.visible = snowing > 0.01;
+  { const c = camera.position, outside = player.onRoof || (roomAt(c.x, c.z) === "out" && !tonyIn(c.x, c.z)), nearOn = outside || c.z < 6 || fireExit.a > 0 || storeExit.a > 0, farOn = c.z < 24 || player.onRoof;   // (deep inside, there's nothing to see it through; behind the buildings, the far box is out of sight)
+    TVU.uFogCam.value = outside ? 1 : 0;
+    F.rain.visible = raining > 0.01 && farOn; F.rainNear.visible = raining > 0.01 && nearOn; F.snow.visible = snowing > 0.01 && farOn; F.snowNear.visible = snowing > 0.01 && nearOn; }
   wxSky.tick(dt, plan); wxClouds.tick(dt, plan);
   wxGlass.tick(dt, WX.kind === "rain" || WX.wet > 0.3 ? WX.wet : 0, raining); wxDrifts.tick(dt, snowing);
   const now = WX.k > 0.15 ? WX.kind : "clear";     // what to say about it

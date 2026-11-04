@@ -461,7 +461,7 @@ function pickHover() {
     else if (aim?.object.userData.combo && aim.distance < 1.6) cm.comboOf = aim.object.userData.combo;
     else if (aim?.object.userData.tony && aim.distance < 2.4) aimTony = aim.object.userData.tony;
     else if (aim?.object.userData.bed && aim.distance < 2.4 && CUSTOMER) aimBed = true;
-    else if (aim?.object.userData.fireExit && aim.distance < 2.2) aimFireExit = aim.object.userData.fireExit;
+    else if (aim?.object.userData.fireExit && aim.distance < 2.2) { aimFireExit = aim.object.userData.fireExit; aimExitDoor = aim.object.userData.exitDoor || fireExit; }
     else if ((aim?.object === screenMesh && aim.distance < 4.5) || (aim?.object === theaterScreenMesh && aim.distance < 9) || (aim?.object.userData.theaterDeck && aim.distance < 3.2)) aimTV = true;
     else if (aim?.object.userData.lamp && aim.distance < 2.6) aimLamp = aim.object.userData.lamp;
     else if (aim?.object.userData.sit && aim.distance < 3.2) { aimCouch = true; aimSeatX = aim.point.x; aimSeatObj = aim.object.userData.seatPos || null; }

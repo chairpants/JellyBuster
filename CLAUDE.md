@@ -57,6 +57,7 @@ Sections inside a file start with a `// ---- name ----` comment; grep for the na
 | Customer mode | `store/customer-mode.js` |
 | Saving, the main loop, room culling, loading, the `__t` test hooks | `store/main.js` |
 | TV picture settings, screensaver | `store/lounge.js` |
+| The time and weather wheel (hold F) | `store/wheel.js` |
 | Renderer, TV-light shader, bloom, rewinding, canvas-texture helpers | `store/core.js` |
 | The register terminal | `pos.js` · sound: `ambience.js` · touch controls: `touch.js` |
 | The Jellyfin link: sign-in form, library to tapes (`placeMovie`, `placeSeries`, `stock`: which shelf block each tape's on, `SHELVES` mirrors what `store/shelves.js` builds), playing | `jellyfin.js` |

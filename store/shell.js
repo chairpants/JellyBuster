@@ -130,7 +130,7 @@ storefront(1.8, XR, 0);                                                   // fro
 box(3.6, H - 2.6, T, mat.wall, 0, 2.6 + (H - 2.6) / 2, 0);                 // above doors
 wall(XL - T / 2, XR + T / 2, Z, true, H, mat.wall, [{ c: BOH_DOORS.store, w: BOH_OPENING_W }]);   // back, with the open way through to the back hall
 wall(0, Z, XL, false, H, mat.wall);                                       // left
-wall(0, Z, XR, false, H, mat.wall);                                       // right
+wall(0, Z, XR, false, H, mat.wall, [{ c: (STORE_EXIT.z0 + STORE_EXIT.z1) / 2, w: STORE_EXIT.z1 - STORE_EXIT.z0 }]);   // right, with the emergency exit in it (the door: store/theater.js)
 colliders.push(frontWallBox = { x0: XL, x1: XR, z0: -T / 2, z1: T / 2 + WALL_PAD });     // front: glass + closed doors, all solid (a customer goes through the right-hand door: see blocked)
 // blue stripe around the walls at eye height — back and sides only; the
 // front is glass now, and a stripe there ran straight across the windows
