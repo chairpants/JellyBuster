@@ -53,7 +53,10 @@ window.StoreAudio = (() => {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) wake(); });
   const ctx = () => {
     if (!ac) {
-      ac = new AudioContext(); bus = ac.createDynamicsCompressor();
+      // Pinned to 48 kHz, or it takes the output device's rate: at 192 kHz everything costs about five times as much and each block has to be
+      // done in 0.67 ms, and when it isn't, it crackles. "playback" gives the audio thread a bigger buffer to ride out a slow block.
+      const AC = window.AudioContext; try { ac = new AC({ sampleRate: 48000, latencyHint: "playback" }); } catch { ac = new AC(); }
+      bus = ac.createDynamicsCompressor();
       bus.threshold.value = -6; bus.knee.value = 6; bus.ratio.value = 12; bus.attack.value = 0.003; bus.release.value = 0.2;
       busFade = ac.createGain(); bus.connect(busFade); busFade.connect(ac.destination);
       ac.onstatechange = () => { if (!document.hidden) setTimeout(wake, 250); };   // knocked off by the device: try to get back on
