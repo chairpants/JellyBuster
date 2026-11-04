@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JellyBuster Link Test</title>
+<style>
+  :root {
+    --bg: #14121f; --panel: #1f1c30; --line: #3b3657; --text: #efeaf8; --dim: #a9a3c0;
+    --accent: #ffd23f; --accent-ink: #231a00; --good: #5fe08a; --bad: #ff7a7a; --warn: #ffb65c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: .02em; color: var(--accent); }
+  h2 { margin: 0 0 12px; font-size: 1.1rem; }
+  .sub { margin: 4px 0 20px; color: var(--dim); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; margin-bottom: 12px; font-size: .9rem; color: var(--dim); }
+  input, textarea { display: block; width: 100%; margin-top: 4px; padding: 10px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  textarea { height: 170px; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  button { padding: 10px 16px; font: inherit; font-weight: 600; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 6px; cursor: pointer; }
+  button.quiet { color: var(--text); background: transparent; border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .spread { justify-content: space-between; }
+  .note { margin: 10px 0 0; font-size: .9rem; color: var(--dim); }
+  .err { margin: 10px 0 0; color: var(--bad); }
+  .warn { margin: 10px 0 0; color: var(--warn); font-size: .9rem; }
+  ul.hosts { list-style: none; margin: 12px 0 0; padding: 0; }
+  ul.hosts li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+  .verdict { font-size: 1.25rem; font-weight: 700; margin: 0 0 4px; }
+  .good { color: var(--good); } .bad { color: var(--bad); } .wait { color: var(--accent); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 14px 0; }
+  .stats div { padding: 8px; background: var(--bg); border-radius: 6px; }
+  .stats b { display: block; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: .8rem; color: var(--dim); }
+  #chatLog { min-height: 48px; max-height: 150px; overflow-y: auto; margin-bottom: 8px; overflow-wrap: anywhere; }
+  #chatForm input { flex: 1 1 180px; width: auto; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>JellyBuster Link Test</h1>
+  <p class="sub">Can two devices connect directly, using Jellyfin only to introduce them?</p>
+
+  <section class="panel" id="signIn">
+    <h2>1. Sign in to Jellyfin</h2>
+    <form id="signInForm">
+      <label>Server address
+        <input id="address" autocomplete="url" placeholder="http://192.168.1.20:8096" required>
+      </label>
+      <label>Username
+        <input id="username" autocomplete="username" required>
+      </label>
+      <label>Password
+        <input id="password" type="password" autocomplete="current-password">
+      </label>
+      <button id="signInBtn" type="submit">Sign in</button>
+      <p class="note">The password goes only to your Jellyfin server and isn't saved. Each device can use the same account or a different one.</p>
+      <p class="err" id="signInErr" hidden></p>
+    </form>
+  </section>
+
+  <section class="panel" id="lobby" hidden>
+    <div class="row spread">
+      <h2 style="margin:0">2. Pair the devices</h2>
+      <button class="quiet" id="signOut" type="button">Sign out</button>
+    </div>
+    <p class="note" id="whoami"></p>
+    <p class="warn" id="localWarn" hidden>You signed in through this computer's own address. On the other device, use this computer's network address instead, such as http://192.168.x.x:8096.</p>
+    <p class="note">On one device, choose Host. On the other, wait for it to appear below and choose Join.</p>
+    <div class="row" style="margin-top:12px"><button id="hostBtn" type="button">Host</button></div>
+    <ul class="hosts" id="hosts"></ul>
+    <p class="note" id="noHosts">Nobody's hosting yet. Looking…</p>
+    <p class="err" id="lobbyErr" hidden></p>
+  </section>
+
+  <section class="panel" id="result" hidden>
+    <p class="verdict wait" id="verdict"></p>
+    <p class="note" id="verdictNote" style="margin-top:0"></p>
+    <div class="stats" id="stats" hidden>
+      <div><b id="sMedian">–</b><span>typical round trip</span></div>
+      <div><b id="sWorst">–</b><span>worst round trip</span></div>
+      <div><b id="sLoss">–</b><span>packets lost</span></div>
+      <div><b id="sCount">0</b><span>round trips</span></div>
+    </div>
+    <div id="chat" hidden>
+      <h2>Say something to the other device</h2>
+      <div id="chatLog" aria-live="polite"></div>
+      <form class="row" id="chatForm">
+        <input id="chatInput" aria-label="Message" maxlength="200" autocomplete="off" placeholder="This goes directly, not through Jellyfin">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="quiet" id="again" type="button">Start over</button></div>
+  </section>
+
+  <section class="panel" id="reportBox" hidden>
+    <div class="row spread" style="margin-bottom:8px">
+      <h2 style="margin:0">Details</h2>
+      <button class="quiet" id="copy" type="button">Copy</button>
+    </div>
+    <textarea id="report" readonly aria-label="Test details"></textarea>
+    <p class="note">Contains no password or sign-in token, so it's safe to paste elsewhere.</p>
+  </section>
+</main>
+
+<script>
+// A standalone test, nothing shared with the game. Two pages sign in to the same Jellyfin server and leave each other
+// their WebRTC connection details as SyncPlay group names: any signed-in user can list those, whichever account made
+// them, and no permissions need changing. Once the direct link is up, both leave their groups.
+const $ = id => document.getElementById(id);
+const OFFER = "jbl1o", ANSWER = "jbl1a", NAME_MAX = 200;    // (Jellyfin refuses group names over 200 characters)
+const CONNECT_TIMEOUT = 30000, VERDICT_AFTER = 10000, PING_MS = 50;
+const ADDRESS_KEY = "jellybuster-link-test-address";
+const deviceId = `jellybuster-link-${randomId(12)}`;        // new on every load, so two tabs are two sessions
+let S = null;       // { url, token, name }
+let ws = null, keepAlive = null;
+let run = 0;        // bumped on every start over: loops left from an earlier try see it's changed and stop
+let pc = null, channel = null, lines = [], tick = null, linkUp = false;
+
+function randomId(n) { return [...crypto.getRandomValues(new Uint8Array(n))].map(b => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join(""); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function log(line) {
+  lines.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
+  $("reportBox").hidden = false;
+  $("report").value = [`JellyBuster link test`, `Browser: ${navigator.userAgent}`, `Page: ${location.protocol}`, ...lines].join("\n");
+  $("report").scrollTop = $("report").scrollHeight;
+}
+
+// ---- Jellyfin ----
+const authHeader = () => `MediaBrowser Client="JellyBuster Link Test", Device="Web browser", DeviceId="${deviceId}", Version="0.1.0"${S?.token ? `, Token="${S.token}"` : ""}`;
+async function api(path, { method = "GET", body, base = S?.url, keepalive = false } = {}) {
+  const r = await fetch(base + path, { method, keepalive, headers: { Authorization: authHeader(), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body && JSON.stringify(body) });
+  if (!r.ok) { const e = new Error(`The server said ${r.status} to ${path}`); e.status = r.status; throw e; }
+  return /json/.test(r.headers.get("content-type") || "") ? r.json() : null;
+}
+function cleanAddress(a) {
+  a = a.trim().replace(/\/+$/, "").replace(/\/web(\/.*)?$/, "");
+  return /^https?:\/\//i.test(a) ? a : `http://${a}`;
+}
+function openSocket(param) {                  // SyncPlay needs a session that's connected, so the socket stays up throughout
+  return new Promise((res, rej) => {
+    const sock = new WebSocket(`${S.url.replace(/^http/i, "ws")}/socket?${param}=${encodeURIComponent(S.token)}&deviceId=${encodeURIComponent(deviceId)}`);
+    sock.onopen = () => res(sock);
+    sock.onerror = () => rej(new Error("socket refused"));
+    sock.onmessage = m => {
+      let d; try { d = JSON.parse(m.data); } catch { return; }
+      if (d.MessageType !== "ForceKeepAlive") return;
+      clearInterval(keepAlive);
+      const beat = () => { if (sock.readyState === 1) sock.send('{"MessageType":"KeepAlive"}'); };
+      beat(); keepAlive = setInterval(beat, Math.max(5, (+d.Data || 60) / 2) * 1000);
+    };
+  });
+}
+const groups = () => api("/SyncPlay/List");
+const makeGroup = name => api("/SyncPlay/New", { method: "POST", body: { GroupName: name } });
+const leaveGroup = () => api("/SyncPlay/Leave", { method: "POST" }).catch(() => {});
+function syncPlayMessage(e) {
+  return e.status === 401 || e.status === 403
+    ? "Jellyfin won't let this account use SyncPlay. In the server's dashboard, set this user's SyncPlay access to allow creating and joining groups."
+    : e.message;
+}
+
+// ---- the connection details, small enough for a group name ----
+// Only what the other side can't work out: the ICE username and password, the certificate's fingerprint, and addresses.
+const bytesToB64 = hex => btoa(String.fromCharCode(...hex.match(/../g).map(x => parseInt(x, 16)))).replace(/=+$/, "");
+const b64ToHex = s => [...atob(s)].map(c => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+const UUID_LOCAL = /^([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})\.local$/i;
+function packHost(h) { return UUID_LOCAL.test(h) ? bytesToB64(h.replace(/\.local$/i, "").replace(/-/g, "")) : h; }
+function unpackHost(h) {
+  if (!/^[A-Za-z0-9+/]{22}$/.test(h)) return h;
+  const x = b64ToHex(h);
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}.local`;
+}
+function pack(sdp, head) {                    // -> { text, used, total }. head: what comes before it in the group's name
+  const field = k => { const m = sdp.match(new RegExp(`^a=${k}:(.*)$`, "m")); if (!m) throw new Error(`The browser's offer has no ${k}`); return m[1].trim(); };
+  const [algo, print] = field("fingerprint").split(" ");
+  if (algo.toLowerCase() !== "sha-256") throw new Error(`This browser uses a ${algo} fingerprint, which this test doesn't handle`);
+  const cands = [...new Set(sdp.split(/\r?\n/).filter(l => l.startsWith("a=candidate")).map(l => l.split(" "))
+    .filter(p => p[2].toLowerCase() === "udp" && p[7] === "host").map(p => `${packHost(p[4])}|${p[5]}`))];
+  if (!cands.length) throw new Error("The browser found no network address to offer. Is this device on the network?");
+  const base = [field("ice-ufrag"), field("ice-pwd"), bytesToB64(print.replace(/:/g, ""))].join(" ");
+  let kept = [];
+  for (const c of cands) if (`${head} ${base} ${[...kept, c].join(",")}`.length <= NAME_MAX) kept.push(c);
+  if (!kept.length) throw new Error("The connection details won't fit in a group name.");
+  return { text: `${base} ${kept.join(",")}`, used: kept.length, total: cands.length };
+}
+function unpack(text, type) {
+  const parts = String(text).split(" ");
+  if (parts.length !== 4) throw new Error("Those connection details don't look right");
+  const [ufrag, pwd, print, list] = parts;
+  if (!/^[A-Za-z0-9+/]{4,64}$/.test(ufrag) || !/^[A-Za-z0-9+/]{22,64}$/.test(pwd) || !/^[A-Za-z0-9+/]{43}$/.test(print)) throw new Error("Those connection details don't look right");
+  const cands = list.split(",").map((c, i) => {
+    const [h, port] = c.split("|"), host = unpackHost(h);
+    if (!/^[A-Za-z0-9.:_-]+$/.test(host) || !/^\d{1,5}$/.test(port)) throw new Error("Those connection details don't look right");
+    return `a=candidate:${i + 1} 1 udp ${2113937151 - i} ${host} ${port} typ host\r\n`;
+  }).join("");
+  const fp = b64ToHex(print).toUpperCase().match(/../g).join(":");
+  return `v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\n${cands}a=ice-ufrag:${ufrag}\r\na=ice-pwd:${pwd}\r\na=fingerprint:sha-256 ${fp}\r\na=setup:${type === "offer" ? "actpass" : "active"}\r\na=mid:0\r\na=sctp-port:5000\r\n`;
+}
+const nameOf = (kind, id, text) => `${kind} ${id} ${text}`;
+function parseName(name) {                    // -> { kind, id, text }, or null if it's some other group
+  const m = /^(jbl1[oa]) ([a-z0-9]{4}) (.+)$/.exec(name || "");
+  return m && { kind: m[1], id: m[2], text: m[3] };
+}
+
+// ---- the direct link ----
+function newPeer() {                          // no STUN or TURN servers: it only connects if the devices can reach each other directly
+  if (!window.RTCPeerConnection) throw new Error("This browser doesn't have WebRTC.");
+  pc = new RTCPeerConnection({ iceServers: [] });
+  linkUp = false;
+  const mine = run;
+  pc.addEventListener("iceconnectionstatechange", () => { if (mine === run) log(`Direct link: ${pc.iceConnectionState}`); });
+  pc.addEventListener("connectionstatechange", () => { if (mine === run && pc.connectionState === "failed") peerGone(); });
+  return pc;
+}
+function gathered(p) {
+  return new Promise(res => {
+    if (p.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 6000);          // whatever's been found by then will have to do
+    p.addEventListener("icegatheringstatechange", () => { if (p.iceGatheringState === "complete") { clearTimeout(t); res(); } });
+  });
+}
+function noteCandidates(p, what) {
+  log(`${what}: ${p.used} network address${p.used === 1 ? "" : "es"} sent${p.used < p.total ? ` (${p.total - p.used} more wouldn't fit in a group name)` : ""}`);
+}
+function show(text, note, cls = "wait") {
+  $("verdict").textContent = text; $("verdict").className = `verdict ${cls}`; $("verdictNote").textContent = note || "";
+}
+function enterResult() {
+  $("lobby").hidden = true; $("result").hidden = false; $("stats").hidden = true; $("chat").hidden = true; $("chatLog").textContent = "";
+}
+async function waitFor(check, ms, mine) {     // calls check about once a second till it gives something. null: timed out or restarted
+  const t = Date.now();
+  while (mine === run && (ms == null || Date.now() - t < ms)) {
+    try { const v = await check(); if (v) return v; }
+    catch (e) { log(`While checking the server: ${e.message}`); }
+    await sleep(1000);
+  }
+  return null;
+}
+async function host() {
+  const mine = ++run, id = randomId(4), started = performance.now();
+  enterResult(); show("Waiting for the other device…", "On the other device, sign in and choose Join.");
+  try {
+    log("Hosting");
+    const p = newPeer();
+    wire(p.createDataChannel("link", { ordered: false, maxRetransmits: 0 }), started);
+    await p.setLocalDescription(await p.createOffer());
+    await gathered(p);
+    if (mine !== run) return;
+    const packed = pack(p.localDescription.sdp, `${OFFER} ${id}`);
+    noteCandidates(packed, "Offer");
+    await makeGroup(nameOf(OFFER, id, packed.text));
+    log("Offer posted to Jellyfin");
+    const answer = await waitFor(async () => (await groups()).map(g => parseName(g.GroupName)).find(g => g?.kind === ANSWER && g.id === id), null, mine);
+    if (mine !== run || !answer) return;
+    log("Answer found");
+    show("Connecting…", "Found the other device. Trying to connect directly.");
+    await leaveGroup();
+    await p.setRemoteDescription({ type: "answer", sdp: unpack(answer.text, "answer") });
+    armTimeout(mine);
+  } catch (e) { if (mine === run) fail(syncPlayMessage(e)); }
+}
+async function join(offer, hostName) {
+  const mine = ++run, started = performance.now();
+  enterResult(); show("Connecting…", `Answering ${hostName}. Trying to connect directly.`);
+  try {
+    log(`Joining ${hostName}`);
+    const p = newPeer();
+    p.ondatachannel = e => wire(e.channel, started);
+    await p.setRemoteDescription({ type: "offer", sdp: unpack(offer.text, "offer") });
+    await p.setLocalDescription(await p.createAnswer());
+    await gathered(p);
+    if (mine !== run) return;
+    const packed = pack(p.localDescription.sdp, `${ANSWER} ${offer.id}`);
+    noteCandidates(packed, "Answer");
+    await makeGroup(nameOf(ANSWER, offer.id, packed.text));
+    log("Answer posted to Jellyfin");
+    armTimeout(mine);
+  } catch (e) { if (mine === run) fail(syncPlayMessage(e)); }
+}
+function armTimeout(mine) {
+  setTimeout(() => { if (mine === run && !(channel && channel.readyState === "open")) fail(); }, CONNECT_TIMEOUT);
+}
+function fail(message) {
+  run++;
+  clearInterval(tick); tick = null;
+  closePeer(); leaveGroup();
+  $("stats").hidden = true; $("chat").hidden = true;
+  const why = "The two devices found each other through Jellyfin, but couldn't connect directly. Usual causes: a guest network or the router's AP isolation setting, a firewall blocking UDP, a VPN on either device, or one device being on another network. In Chrome, you can also try turning off chrome://flags/#enable-webrtc-hide-local-ips-with-mdns on both devices.";
+  show("Didn't connect", message || why, "bad");
+  log(`Result: FAILED. ${message || "No direct connection within the time allowed."}`);
+}
+function peerGone() {                         // the link's ended: either it never came up, or it did and has now gone
+  if (!linkUp) return fail();
+  run++;
+  clearInterval(tick); tick = null;
+  closePeer();
+  $("chat").hidden = true;
+  show("The other device left", "The link was working until then. If that device is still open, the connection dropped.", "bad");
+  log("Link lost");
+}
+function closePeer() {
+  try { channel?.close(); } catch {} try { pc?.close(); } catch {}
+  channel = null; pc = null;
+}
+
+// ---- the test, once connected: 20 small unreliable packets a second, about what a game's position updates would be ----
+function wire(ch, started) {
+  const mine = run, peerConn = pc;
+  let began = false;
+  const begin = () => { if (began || mine !== run) return; began = true; connected(ch, peerConn, started, mine); };
+  channel = ch;
+  ch.onopen = begin;
+  ch.onclose = () => { if (mine === run) peerGone(); };
+  ch.onerror = () => { if (mine === run) log("Link error"); };
+  if (ch.readyState === "open") begin();      // (a joiner's channel can already be open when it's handed over)
+}
+async function connected(ch, peerConn, started, mine) {
+  const ms = Math.round(performance.now() - started), rtts = [], pending = new Map();
+  let seq = 0, lost = 0, verdictShown = false;
+  const since = performance.now();
+  let lastHeard = since;
+  linkUp = true;
+  log(`Connected ${ms} ms after starting`);
+  leaveGroup();                               // Jellyfin's part is over
+  show("Connected, measuring…", "Jellyfin's part is done: this link goes directly between the devices.");
+  $("stats").hidden = false; $("chat").hidden = false;
+  ch.onmessage = e => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (mine !== run) return;
+    lastHeard = performance.now();
+    if (d.t === "bye") return peerGone();
+    if (d.t === "ping") { if (ch.readyState === "open") ch.send(JSON.stringify({ t: "pong", n: d.n })); }
+    else if (d.t === "pong" && pending.has(d.n)) { rtts.push(performance.now() - pending.get(d.n)); pending.delete(d.n); if (rtts.length > 2000) rtts.shift(); }
+    else if (d.t === "chat" || d.t === "hi") {
+      const line = document.createElement("div");
+      line.textContent = d.t === "hi" ? `${d.name} connected.` : `${d.name}: ${d.text}`;
+      $("chatLog").append(line); $("chatLog").scrollTop = $("chatLog").scrollHeight;
+      if (d.t === "chat") log("Chat message received");
+    }
+  };
+  ch.send(JSON.stringify({ t: "hi", name: S.name.slice(0, 64) }));
+  $("chatForm").onsubmit = e => {
+    e.preventDefault();
+    const text = $("chatInput").value.trim();
+    if (!text || ch.readyState !== "open") return;
+    ch.send(JSON.stringify({ t: "chat", name: S.name.slice(0, 64), text }));
+    const line = document.createElement("div"); line.textContent = `You: ${text}`;
+    $("chatLog").append(line); $("chatLog").scrollTop = $("chatLog").scrollHeight;
+    $("chatInput").value = ""; log("Chat message sent");
+  };
+  let path = "";
+  tick = setInterval(async () => {
+    if (mine !== run || ch.readyState !== "open") return;
+    const now = performance.now();
+    if (now - lastHeard > 5000) return peerGone();
+    for (const [n, t] of pending) if (now - t > 1000) { pending.delete(n); lost++; }
+    pending.set(++seq, now);
+    ch.send(JSON.stringify({ t: "ping", n: seq }));
+    if (seq % 10) return;
+    const sorted = [...rtts].sort((a, b) => a - b), median = sorted[sorted.length >> 1] ?? 0, worst = sorted[sorted.length - 1] ?? 0;
+    const answered = rtts.length + lost, lossPct = answered ? 100 * lost / answered : 0;
+    $("sMedian").textContent = `${median.toFixed(1)} ms`; $("sWorst").textContent = `${worst.toFixed(0)} ms`;
+    $("sLoss").textContent = `${lossPct.toFixed(1)}%`; $("sCount").textContent = String(rtts.length);
+    if (verdictShown || now - since < VERDICT_AFTER) return;
+    verdictShown = true;
+    if (!path) path = await routeOf(peerConn);
+    if (!rtts.length) { show("Connected, but nothing came back", "The link opened, but packets aren't getting through.", "bad"); log("Result: FAILED. No round trips."); return; }
+    show("It works!", "These two devices can talk directly on your network. It keeps measuring for as long as this stays open.", "good");
+    log(`Result: PASSED. Typical ${median.toFixed(1)} ms, worst ${worst.toFixed(0)} ms, ${lossPct.toFixed(1)}% lost over ${rtts.length} round trips. ${path}`);
+  }, PING_MS);
+}
+async function routeOf(p) {
+  try {
+    const st = await p.getStats(); let out = "";
+    st.forEach(r => { if (r.type === "candidate-pair" && r.nominated && !out) out = `Route: ${st.get(r.localCandidateId)?.candidateType}/${st.get(r.localCandidateId)?.protocol} to ${st.get(r.remoteCandidateId)?.candidateType}/${st.get(r.remoteCandidateId)?.protocol}.`; });
+    return out;
+  } catch { return ""; }
+}
+
+// ---- the lobby ----
+async function lobbyLoop() {
+  const mine = ++run;
+  $("noHosts").textContent = "Nobody's hosting yet. Looking…";
+  while (mine === run && S) {
+    try {
+      const list = (await groups()).map(g => ({ parsed: parseName(g.GroupName), who: (g.Participants || []).join(", ") || "Someone" })).filter(g => g.parsed?.kind === OFFER);
+      if (mine !== run) return;
+      $("hosts").replaceChildren(...list.map(g => {
+        const li = document.createElement("li"), who = document.createElement("span"), b = document.createElement("button");
+        who.textContent = `${g.who} is hosting`; b.type = "button"; b.textContent = "Join";
+        b.onclick = () => join(g.parsed, g.who);
+        li.append(who, b); return li;
+      }));
+      $("noHosts").hidden = list.length > 0;
+      $("lobbyErr").hidden = true;
+    } catch (e) { $("lobbyErr").textContent = syncPlayMessage(e); $("lobbyErr").hidden = false; }
+    await sleep(1500);
+  }
+}
+function backToLobby() {
+  run++;
+  clearInterval(tick); tick = null;
+  closePeer(); leaveGroup();
+  $("result").hidden = true; $("lobby").hidden = false;
+  lobbyLoop();
+}
+
+// ---- signing in and out ----
+function goodbye() {
+  try { if (channel?.readyState === "open") channel.send('{"t":"bye"}'); } catch {}
+  if (!S?.token) return;
+  api("/SyncPlay/Leave", { method: "POST", keepalive: true }).catch(() => {});
+  api("/Sessions/Logout", { method: "POST", keepalive: true }).catch(() => {});
+}
+$("signInForm").onsubmit = async e => {
+  e.preventDefault();
+  $("signInErr").hidden = true; $("signInBtn").disabled = true;
+  const url = cleanAddress($("address").value);
+  try {
+    if (location.protocol === "https:" && url.startsWith("http:")) throw new Error("This page is on https and that server isn't, so the browser won't let them talk. Open this file from your own device instead.");
+    let res;
+    try {
+      res = await api("/Users/AuthenticateByName", { method: "POST", base: url, body: { Username: $("username").value.trim(), Pw: $("password").value } });
+    } catch (err) {
+      if (err.status === 401) throw new Error("That username or password wasn't right.");
+      if (err.status) throw err;
+      throw new Error(`Can't reach ${url}. Is the address right, and is Jellyfin running?`);
+    }
+    S = { url, token: res.AccessToken, name: res.User?.Name || $("username").value.trim() };
+    try { ws = await openSocket("ApiKey"); }
+    catch { ws = await openSocket("api_key").catch(() => null); }
+    const info = await api("/System/Info/Public").catch(() => null);
+    log(`Signed in. Jellyfin ${info?.Version || "(version unknown)"}; live connection ${ws ? "up" : "REFUSED"}`);
+    try { localStorage.setItem(ADDRESS_KEY, url); } catch {}
+    $("password").value = "";
+    $("whoami").textContent = `Signed in as ${S.name} on ${url}`;
+    $("localWarn").hidden = !/^https?:\/\/(localhost|127\.|\[::1\])/i.test(url);
+    $("signIn").hidden = true; $("lobby").hidden = false;
+    if (!ws) { $("lobbyErr").textContent = "Signed in, but Jellyfin refused the live connection this test needs. A reverse proxy may be blocking WebSockets."; $("lobbyErr").hidden = false; }
+    lobbyLoop();
+  } catch (err) {
+    S = null; $("signInErr").textContent = err.message; $("signInErr").hidden = false;
+  } finally { $("signInBtn").disabled = false; }
+};
+$("hostBtn").onclick = host;
+$("again").onclick = backToLobby;
+$("signOut").onclick = () => {
+  run++; goodbye(); clearInterval(keepAlive); try { ws?.close(); } catch {}
+  ws = null; S = null;
+  $("hosts").replaceChildren(); $("lobby").hidden = true; $("signIn").hidden = false;
+};
+$("copy").onclick = async () => {
+  const done = () => { $("copy").textContent = "Copied"; setTimeout(() => { $("copy").textContent = "Copy"; }, 1500); };
+  try { await navigator.clipboard.writeText($("report").value); done(); }
+  catch { $("report").select(); try { if (document.execCommand("copy")) done(); } catch {} }
+};
+addEventListener("pagehide", goodbye);
+try { $("address").value = localStorage.getItem(ADDRESS_KEY) || ""; } catch {}
+</script>
+</body>
+</html>

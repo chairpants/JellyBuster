@@ -303,7 +303,17 @@
       <div id="playHint" hidden></div>
       <div class="ttl" id="mmTitle">SELECT A STORE</div>
       <div id="mmFiles"></div>
+      <button id="mmTogetherBtn" class="back">PLAY TOGETHER</button>
       <button id="mmSettingsBtn" class="back">SETTINGS</button>
+    </div>
+    <div class="mm" id="mmTogether" hidden>
+      <div class="ttl">PLAY TOGETHER</div>
+      <div class="note">Two players on the same network, signed in to the same Jellyfin. Whoever joins comes in as a customer: any tape's free, and nobody throws them out at closing. You'll see each other and share the time and weather (either of you can change them: hold F). Everything else is your own copy of the store, so customers and tapes won't match.</div>
+      <div class="note" id="tgStatus" aria-live="polite"></div>
+      <button id="tgHost">HOST</button>
+      <div id="tgHosts"></div>
+      <button id="tgStop" class="back" hidden>STOP</button>
+      <button id="tgBack" class="back">BACK</button>
     </div>
     <div class="mm" id="mmSettings" hidden>
       <div class="ttl">SETTINGS</div>
@@ -408,7 +418,7 @@
   for (const t of INPUT) addEventListener(t, hold, true);
   for (const f of ["store/core", "store/shell", "store/backrooms", "store/theater", "exterior/lot", "exterior/grounds", "exterior/serviceroad", "store/lobby", "store/shelves", "store/theaterlobby", "store/lounge",
     "store/shift", "exterior/sky", "store/clock", "store/player", "store/shoppers", "store/staff", "store/checkout", "store/phone", "tonys/light", "tonys/inside", "tonys/cabinets", "tonys/arcade", "tonys/missile", "tonys/yard",
-    "tonys/outside", "store/roofkit", "store/roof", "store/chores", "store/tapebox", "store/tv", "store/title", "store/customer-mode", "store/wheel", "store/main"]) {
+    "tonys/outside", "store/roofkit", "store/roof", "store/chores", "store/tapebox", "store/tv", "store/title", "store/customer-mode", "store/wheel", "store/together", "store/main"]) {
     const s = document.createElement("script"); s.src = `${f}.js`; s.async = false;   // async off: run in order, not as they arrive
     if (f === "store/main") s.onload = s.onerror = () => { for (const t of INPUT) removeEventListener(t, hold, true); };
     document.body.appendChild(s);

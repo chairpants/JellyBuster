@@ -56,11 +56,14 @@ Sections inside a file start with a `// ---- name ----` comment; grep for the na
 | Title screen, pointer lock, gate alarm, clocking out | `store/title.js` |
 | Customer mode | `store/customer-mode.js` |
 | Saving, the main loop, room culling, loading, the `__t` test hooks | `store/main.js` |
+| Playing together on the same network: pairing through Jellyfin's SyncPlay group names, the direct WebRTC link, the other player's body, joining as a guest (`GUEST`), the shared time and weather | `store/together.js` |
 | TV picture settings, screensaver | `store/lounge.js` |
 | The time and weather wheel (hold F) | `store/wheel.js` |
 | Renderer, TV-light shader, bloom, rewinding, canvas-texture helpers | `store/core.js` |
 | The register terminal | `pos.js` · sound: `ambience.js` · touch controls: `touch.js` |
 | The Jellyfin link: sign-in form, library to tapes (`placeMovie`, `placeSeries`, `stock`: which shelf block each tape's on, `SHELVES` mirrors what `store/shelves.js` builds), playing | `jellyfin.js` |
+
+`JellyBusterLink/index.html` is a standalone page, nothing shared with the game, for checking two devices can connect directly.
 
 ## Testing
 

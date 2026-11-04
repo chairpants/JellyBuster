@@ -19,13 +19,16 @@
   };
   let link = (() => { try { return JSON.parse(store.get(KEY)) || null; } catch { return null; } })();   // { url, token, userId, userName, serverName }
   const deviceId = store.get(DEVICE_KEY) || (() => { const id = `jellybuster-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`; store.set(DEVICE_KEY, id); return id; })();
-  const authHeader = token => `MediaBrowser Client="JellyBuster", Device="Web browser", DeviceId="${deviceId}", Version="${VERSION}"${token ? `, Token="${token}"` : ""}`;
+  const authHeader = (token, device = deviceId) => `MediaBrowser Client="JellyBuster", Device="Web browser", DeviceId="${device}", Version="${VERSION}"${token ? `, Token="${token}"` : ""}`;
+  // Playing together (store/together.js) needs a session of this tab's own, or two tabs would be one session to the
+  // server. The same token under another DeviceId is exactly that, and adds nothing to the server's list of devices
+  const tabDevice = `${deviceId}-${Math.random().toString(36).slice(2, 10)}`;
 
-  async function call(base, token, path, { method = "GET", body, timeout = 15000, keepalive = false } = {}) {
+  async function call(base, token, path, { method = "GET", body, timeout = 15000, keepalive = false, device } = {}) {
     let r;
     try {
       r = await fetch(base + path, { method, keepalive, signal: keepalive ? undefined : AbortSignal.timeout(timeout),
-        headers: { Authorization: authHeader(token), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body && JSON.stringify(body) });
+        headers: { Authorization: authHeader(token, device), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body && JSON.stringify(body) });
     } catch (e) {
       const err = new Error(unreachable(base, e)); err.offline = true; throw err;
     }
@@ -438,6 +441,7 @@
 
   window.Jelly = {
     ready, attach, stop, details, onTrouble: null,
+    tabApi: (path, opts) => api(path, { ...opts, device: tabDevice }),   // a call as this tab's own session
     nextCaptions() {                              // T: each track in turn, then off. -> what to say
       if (!cc.tracks.length) return "NO CAPTIONS ON THIS TAPE";
       const i = cc.on + 1 < cc.tracks.length ? cc.on + 1 : -1;

@@ -19,12 +19,13 @@ function wheelMouse(dx, dy) {                    // the pointer, held to the rin
   WHEEL.hover = d < WHEEL.IN * 0.5 ? -1 : Math.floor((((Math.atan2(WHEEL.y, WHEEL.x) + Math.PI / 2 + step / 2) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / step);
   wheelDraw();
 }
-function wheelPick(o) {
+function wheelPick(o, fromOtherPlayer = false) {
   if (o[1] === "time") {
     const was = shift.h; shift.warp = 0; shift.h = o[2];
     if (CUSTOMER) cmClock(at => was < at && shift.h >= at);   // (past opening or closing: what happens then still happens)
   } else wxSetNow(o[0], o[2], o[3], o[4], o[5], o[6]);
   window.StoreTrees?.refresh();
+  togetherSkyPicked(o, fromOtherPlayer);
 }
 function wheelClick(button) {                    // -> it took the click
   if (!WHEEL.open) return false;

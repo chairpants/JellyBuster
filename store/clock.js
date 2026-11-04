@@ -2,7 +2,7 @@
 function shiftTick(dt) {
   if (shift.report) return;
   if (shift.greet && document.pointerLockElement === canvas) { toast(shift.greet, true); shift.greet = null; }
-  if (started && (document.pointerLockElement === canvas || posTerm.isOpen())) {
+  if (started && !GUEST && (document.pointerLockElement === canvas || posTerm.isOpen())) {   // (a guest's clock is the host's: see store/together.js)
     const was = shift.h;
     if (shift.warp > shift.h) shift.h = Math.min(shift.warp, shift.h + dt / 2.5);   // L: an hour in 2.5 s
     else shift.h += dt / (shift.h < SHIFT.close ? SHIFT.hour : 3600);             // after close: real time

@@ -7,7 +7,7 @@
 // couple of seconds and on the way out; a tape that was playing sits in the
 // VCR and starts its episode again on your first click into the store (a
 // browser won't autoplay sound before that), from where it was wound to.
-let resumePlay = null, saveOff = !!DEBUG_LVL;
+let resumePlay = null, saveOff = !!DEBUG_LVL || !!GUEST;
 const snackUnits = () => [...new Set(aimables.map(o => o.userData.unit || (o.userData.snack ? o : null)).filter(Boolean))];
 // a lane: one product's column on a rack or cooler shelf, front to back (and each stack top to bottom). Shoppers
 // take from the front and the top; restocking fills from the back and the bottom, so a gap is never stuck behind a pack
@@ -129,6 +129,7 @@ loadState(SAVE);
 if (CUSTOMER) cmLoad(SAVE?.cm);
 if (!SAVE?.stock) for (const e of stockProducts()) backstock[e.name] ??= CASE_QTY;   // a new store: a case of everything in the cupboards
 if (!SAVE?.shift) beginShift();              // a new store (or one saved before the shift clock): day 1, first thing
+if (GUEST) guestSetup();
 gateLastZ = player.z;                        // restored position isn't a walk through the gates
 counterItemsList();                          // (marks the rewinders, pad and printer as movable)
 libLock(); amenities();                     // simulation: what the store hasn't got yet
@@ -168,7 +169,7 @@ function roomOf(o) {
   return rs.size === 1 ? [...rs][0] : null;
 }
 function roomSort() {                          // file new top-level objects into their rooms (posters load late, so this runs a few times)
-  const movers = new Set([me.group, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
+  const movers = new Set([me.group, together.g, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
   for (const o of [...scene.children]) {
     if (roomSeen.has(o) || roomGroupSet.has(o)) continue;
     roomSeen.add(o);
@@ -400,6 +401,7 @@ renderer.setAnimationLoop(() => {
   invSync();
   cutoutCarryTick();
   stoolCarryTick();
+  togetherTick(dt);
   custTick(dt); frontDoorTick(dt); fireExitTick(dt); fullVidTick(); tonyTick(dt); if (CUSTOMER) cmTick(dt);
   empTick(dt);
   trashTick(dt);
@@ -435,7 +437,7 @@ renderer.setAnimationLoop(() => {
   ambTick(dt);
   if (booted) { const handBack = meHandFollow(); renderWithBloom(); handBack?.(); }   // (the store ticks along from the start; it's drawn once boot's ready)
 });
-window.__t = { arcade, arcadeStart, arcadeStop, mcFire, shift, bulb, tonyLightsTick, siKey, siTick, asTick, LOT, cmSleep, roomAt, lotCars: () => carsOut?.all(), tony, tonyE, TONY_IN, cm, CUSTOMER, invSync, cmTrail, SEARCHES, cmSearch, cmNoSale, invRemove, cmTakeFrom, cmSpentTick, INV_MAX, cmTrailSet, pickupMesh, TV, cmRecommend, onShelfCopy, cmTeeOff, cmHelped, cmMorning, putBack, strays, misshelve, cmTicket, cmShowTick, show, SHOW, cmComboKey, COMBOS, cmTermOpen, cmTermKey, cmSpill, cmSearchBin, cmSlip, cmMoneyDrop, pickupMeshes, redNights: () => redNights, setRedNights: n => { redNights = n; }, cmPay, cmCaught, cmSees, cmStaffOnly, cmPickUp, PICKUPS, KEYED, ITEMS, becomeCustomer, cmNextDay, outBlocked, blocked, carsOut: () => carsOut, golfLost, roof, roofClimb, backLadderE, backLadderDrop, decorDraw, decor, postersSwap, posterFor, WX, wxDrifts, weatherTick, wxPlan, walkers, walkerTick, walkerMake, pizzaRun, npcStyle, custTick: dt => custTick(dt), exteriorTick: dt => exteriorTick(dt), parkLot: (d, b) => parkLot(d, b), passCar: c => passCar(c), driveIn: (l, f) => driveIn(l, f), driveOut: c => driveOut(c), carNew: () => carNew(), sfxOut, shiftDate, season, calendarDraw, corkDraw,
+window.__t = { together, togetherOpen, arcade, arcadeStart, arcadeStop, mcFire, shift, bulb, tonyLightsTick, siKey, siTick, asTick, LOT, cmSleep, roomAt, lotCars: () => carsOut?.all(), tony, tonyE, TONY_IN, cm, CUSTOMER, invSync, cmTrail, SEARCHES, cmSearch, cmNoSale, invRemove, cmTakeFrom, cmSpentTick, INV_MAX, cmTrailSet, pickupMesh, TV, cmRecommend, onShelfCopy, cmTeeOff, cmHelped, cmMorning, putBack, strays, misshelve, cmTicket, cmShowTick, show, SHOW, cmComboKey, COMBOS, cmTermOpen, cmTermKey, cmSpill, cmSearchBin, cmSlip, cmMoneyDrop, pickupMeshes, redNights: () => redNights, setRedNights: n => { redNights = n; }, cmPay, cmCaught, cmSees, cmStaffOnly, cmPickUp, PICKUPS, KEYED, ITEMS, becomeCustomer, cmNextDay, outBlocked, blocked, carsOut: () => carsOut, golfLost, roof, roofClimb, backLadderE, backLadderDrop, decorDraw, decor, postersSwap, posterFor, WX, wxDrifts, weatherTick, wxPlan, walkers, walkerTick, walkerMake, pizzaRun, npcStyle, custTick: dt => custTick(dt), exteriorTick: dt => exteriorTick(dt), parkLot: (d, b) => parkLot(d, b), passCar: c => passCar(c), driveIn: (l, f) => driveIn(l, f), driveOut: c => driveOut(c), carNew: () => carNew(), sfxOut, shiftDate, season, calendarDraw, corkDraw,
   catalog, pickup, onE, player, playEpisode, eject, boxState, tapeBox, media, mediaDown, mediaUp, togglePause, tvHear, hearRoomAt, fireExit, storeExit, fireExitUse, exitDoorTick, frontDoor, jump, jumpStart, jumpTick, WHEEL, wheelOpen, wheelMouse, wheelClick, WX,
   held: () => held, playing: () => playing, returnBin,
   setAim: v => { aimTV = v; },

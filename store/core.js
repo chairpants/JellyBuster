@@ -589,7 +589,9 @@ const SAVE_KEY = slotKey(SLOT);
 // settings (per browser, not per store): see the title menu's SETTINGS
 const SETTINGS = { sound: 100, sens: 100, invertY: false, shiftMin: 21, aa: !LOWMEM, ...(() => { try { return JSON.parse(localStorage.getItem("jellybuster-settings")) || {}; } catch { return {}; } })() };
 const SAVE_V = 3;                            // v1 keyed tapes by id (every season of a show shares it); v2 by catalog position (shifts when tapes are added)
-const SAVE = (() => { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s?.v === SAVE_V ? s : null; } catch { return null; } })();
+// a guest (see store/together.js): joined somebody else's game, so a customer in a store of the moment that's never saved. { who: the host, offer: till it's been answered }
+const GUEST = (() => { try { return JSON.parse(sessionStorage.getItem("jellybuster-guest")); } catch { return null; } })();
+const SAVE = GUEST ? { v: SAVE_V, mode: "customer", fresh: true } : (() => { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s?.v === SAVE_V ? s : null; } catch { return null; } })();
 {                                            // a store saved before the game was set in 1996: move its calendar (and every date it kept) back to Sept 30 1996
   const DAY1 = +new Date(1996, 8, 30, 12), d0 = SAVE?.shift?.date0;
   if (d0 > +new Date(2000, 0, 1)) {
