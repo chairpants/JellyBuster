@@ -1,41 +1,61 @@
-# JellyBuster
+<div align="center">
 
-A first-person 90s video store with its shelves stocked from **your own Jellyfin library**. Every movie is a tape, every season of a show is a tape, and what you put in the VCR streams from your server. Inside the game the store is still called JellyBuster.
+<img src="docs/screenshots/logo.jpg" alt="JellyBuster: Wow! What a selection." width="620">
 
-## Linking your Jellyfin
+### A first-person 90s video store, stocked from **your own** Jellyfin library.
 
-1. Open `index.html` in a browser, straight from your computer (`file://`). There's nothing to build or serve. You need an internet connection, because three.js and hls.js load from a CDN.
-2. Enter your server's address (for example `http://your-server:8096`) and sign in with your Jellyfin user and password, or use **Quick Connect** and approve the code in a Jellyfin app that's already signed in.
-3. The library is read fresh each time the game loads. **SETTINGS → UNLINK JELLYFIN** signs out; your store saves stay.
+![three.js](https://img.shields.io/badge/three.js-r170-1b3fa0?style=flat-square)
+![Jellyfin](https://img.shields.io/badge/Jellyfin-your%20library-ffd400?style=flat-square&labelColor=1b3fa0)
+![No build](https://img.shields.io/badge/build%20step-none-1b3fa0?style=flat-square)
+![Co-op](https://img.shields.io/badge/co--op-same%20network-ffd400?style=flat-square&labelColor=1b3fa0)
+![License: MIT](https://img.shields.io/badge/license-MIT-1b3fa0?style=flat-square)
 
-The browser talks to your server directly, with no proxy. Your address and a session token are kept in this browser's localStorage. Your password isn't kept. The token also goes in the video URLs, as Jellyfin requires, so over plain http it's visible on your network like any other Jellyfin traffic.
+[Play now](#%EF%B8%8F-play-now) · [Your library](#-your-library-on-actual-shelves) · [The job](#-work-the-shift) · [Play together](#-play-together) · [Screenshots](#-take-the-tour) · [Controls](#%EF%B8%8F-controls) · [Under the hood](#-under-the-hood)
 
-**Don't host it on https** (GitHub Pages, say) if your server is plain http: browsers block an https page from reaching an http server. Open the file locally, or put Jellyfin behind https.
+<img src="docs/screenshots/slideshow.webp" alt="A slideshow of the store, the register, the theater, Tony's arcade, the roof and the lot in snow" width="800">
 
-### How your library goes on the shelves
+**It's 7:25 on a Friday night, there's a line at the counter,<br>somebody by the door has a tape under their jacket, and the store is yours.**
 
-- **Sections** come from each title's Jellyfin genres, best fit first (see `placeMovie` and `placeSeries` in `jellyfin.js`).
-- **The walls** (new releases) get your newer movies. The oldest 15% or so go on the classics shelves in the middle, and TV goes on the shelving east of the walkway. Kids' titles go by the windows, judged from genres and rating.
-- **Classic Horror** is its own shelf with its own sign: your best-rated pre-2000 horror films, if you have at least 11. Otherwise that shelf isn't there.
-- **Staff Picks** and the wall posters are your best-rated titles.
-- **Room:** the store holds about 3,000 tapes. Past that, the lowest rated are left out, and SETTINGS tells you how many.
-- **Spare room** is filled with extra copies, so a small library still fills the store.
-
-### What goes back to your server
-
-Playing a tape tells Jellyfin like any other client (started, progress, stopped), so **watching in the game counts as watching on your account**: resume points and played status can change. Customers renting tapes in the game don't touch your server. The game's tape position is its own: a tape plays from wherever it's wound to in the game, not from your Jellyfin resume point.
-
-Files your browser can play (mp4 or webm with browser-friendly codecs) play directly. Anything else (mkv, HEVC where unsupported, AC3/DTS audio) is remuxed or transcoded by your server as HLS, which uses its CPU or GPU.
+</div>
 
 ---
 
-**It's 7:25 on a Friday night, there's a line at the counter, somebody by the door has a tape under their jacket, and the store is yours.**
+## ▶️ Play now
 
-JellyBuster is a first-person shift at a neighborhood video store in the 90s. You're the one behind the counter. You work the register, keep the place running, and turn a half-empty storefront into the store everybody in town goes to on a Friday night.
+1. **Download or clone** this repo. There's nothing to build or install.
+2. **Open `index.html`** in a browser, straight from your computer.
+3. **Link your Jellyfin:** enter your server's address (like `http://your-server:8096`) and sign in, or use **Quick Connect**.
+4. **Pick a store** and clock in. It runs with keyboard and mouse, or on a touchscreen.
 
----
+> [!NOTE]
+> You need an internet connection, because three.js and hls.js load from a CDN.
 
-## Your first few minutes
+> [!IMPORTANT]
+> **Don't host it on https** (GitHub Pages, say) if your server is plain http: browsers block an https page from reaching an http server. Open the file locally, or put Jellyfin behind https.
+
+## 📼 Your library, on actual shelves
+
+Every movie is a tape. Every season of a show is a tape. Put one in the VCR and it streams from your server.
+
+- **Sections** come from each title's genres.
+- **The walls** get your newer movies, and the oldest go on the classics shelves.
+- **Classic Horror** earns its own shelf and sign if you own enough of it.
+- **Staff Picks** and the wall posters are your best rated.
+- **Holds about 3,000 tapes**, and a small library gets extra copies so the store still looks full.
+
+> [!WARNING]
+> **Watching in the game counts as watching on your account:** resume points and played status can change. Customers renting tapes in the game don't touch your server.
+
+Your password isn't kept. Your server's address and a session token stay in this browser's storage, and the browser talks to your server directly, with no proxy.
+
+## 🧾 Work the shift
+
+It's 9 AM, the doors are locked, and you have an hour. Flip on the lights, empty the returns slot, rewind what came back, shelve it, stock the candy rack, then unlock the doors.
+
+The chime goes. Swipe the card, ring it up, desensitize the tape, take the money. Then the phone rings. Then a customer with darting eyes heads for the door.
+
+<details>
+<summary><b>Read the full first shift</b></summary>
 
 It's 9 AM and the doors are still locked. You have an hour.
 
@@ -47,9 +67,12 @@ Then the phone rings. Someone wants to know if you have a particular movie in. S
 
 Then a customer with darting eyes heads for the door.
 
----
+</details>
 
-## Then it becomes your store
+**Then it becomes your store:** hire, schedule, delegate, level up your staff, spend what you earn, and keep the place clean.
+
+<details>
+<summary><b>How the store grows</b></summary>
 
 You can't do it all yourself for long, and you're not supposed to.
 
@@ -65,29 +88,118 @@ You can't do it all yourself for long, and you're not supposed to.
 
 **Keep it clean.** Soda gets spilled, popcorn ends up in the carpet, bins overflow, ceiling lights burn out. Grab the mop, the carpet sweeper, or the step ladder from the janitor's closet. Whatever's left at midnight counts against you on the closing check.
 
----
+</details>
 
-## The feel of the place
+<details>
+<summary><b>The feel of the place</b></summary>
 
 Buzzing fluorescent tubes, blue carpet, a confetti-print kids' corner, posters ringed with marquee bulbs, and a DOS terminal on the counter that wants an F-key for everything. A customer's TV-set head smiles when you get their order right and scowls when you leave them waiting.
 
 All the sound is generated live instead of recorded: ballast hum, room tone, traffic outside the glass, the door chime, the cooler's compressor kicking on. The day goes by outside the front windows, from morning light to golden hour to sodium lamps over an empty lot. After close it's just you, the lounge lamps and whatever you left undone.
 
----
+</details>
 
-## Clock in
+## 🎮 Three ways to play
 
-Open `index.html` in a browser (see above). It runs with keyboard and mouse, and you can play it on a touchscreen too.
+| 🏗️ Simulation | 🛒 Sandbox | 🕵️ Customer |
+|---|---|---|
+| A bare-bones store: no staff, the theater chained shut, a small member list. Build it up from what it earns. | $10,000 and Dana on staff from the start. Buy what you like and get playing. | The other side of the counter. Walk in with your own wallet, pay for what you take (or don't), and see how far you can get. |
 
-- **Simulation** starts you in a bare-bones store: no staff, the theater chained shut, a small member list. Build it up from what it earns.
-- **Sandbox** gives you $10,000 and Dana on staff from the start. Buy what you like and get playing.
-- **Customer** puts you on the other side of the counter. The store runs itself, and you walk in off the lot with your own wallet. Pay for what you take (or don't, if nobody's looking), stay out of the back, and see how far you can get. Some doors are locked and some things padlocked, and what opens them is out there somewhere. Be a good customer and they'll treat you like a regular. In Simulation, keep the store in the red three nights running and the owner fires you: you're back the next day as a customer.
+Three save files, like an old cartridge: **play**, **copy** or **delete**.
 
-Three save files, like an old cartridge: pick one to **play**, **copy** or **delete** it. The store remembers where you left everything. If you like it, tell someone who used to work behind a counter.
+## 🍿 Play together
 
----
+Bring someone on your home network. There's no server to run: Jellyfin introduces you, then your browsers talk directly.
 
-## Controls
+```text
+   HOST  ─────┐                              ┌─────  GUEST
+  (plays as   ├───  Jellyfin says "hi"  ─────┤     (a customer,
+   usual)     └═══  direct connection  ══════┘      here for movies)
+```
+
+1. **Host:** start a store, press Esc, then choose **Play Together → Host**.
+2. **Guest:** on the other device, choose **Play Together** and join the host.
+
+| | |
+|---|---|
+| **Shared** | Seeing each other, the time of day, the weather (either of you can change them) |
+| **Your own copy** | Customers, tapes, and the movie you're watching |
+| **Guest perks** | Every tape's free, nobody walks you out at midnight, and your own saves aren't touched |
+
+<details>
+<summary><b>Getting it onto a phone, and if it won't connect</b></summary>
+
+Computers can each just open their own copy of `index.html`. Phones are bad at opening local game folders, so serve it from a computer on your network, keeping that running while you play:
+
+```sh
+python3 -m http.server 8000
+```
+
+Then open `http://<that-computer's-address>:8000` on the phone.
+
+If the two devices can't connect, the usual causes are a guest network or your router's AP isolation setting, a firewall blocking UDP, or a VPN. `JellyBusterLink/index.html` is a small standalone page for testing just the connection.
+
+</details>
+
+## 📸 Take the tour
+
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/lot-day.jpg"><img src="docs/screenshots/lot-day.jpg" alt="The storefront, midday"></a><br><sub>The storefront, midday</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/lot-gold.jpg"><img src="docs/screenshots/lot-gold.jpg" alt="Golden hour"></a><br><sub>Golden hour</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/lot-night.jpg"><img src="docs/screenshots/lot-night.jpg" alt="After dark, with Tony's next door"></a><br><sub>After dark, with Tony's next door</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/lot-rain.jpg"><img src="docs/screenshots/lot-rain.jpg" alt="A storm rolling through"></a><br><sub>A storm rolling through</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/lot-snow.jpg"><img src="docs/screenshots/lot-snow.jpg" alt="Snowed in"></a><br><sub>Snowed in</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/wheel.jpg"><img src="docs/screenshots/wheel.jpg" alt="Hold F: pick the hour and the weather"></a><br><sub>Hold F: pick the hour and the weather</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/front.jpg"><img src="docs/screenshots/front.jpg" alt="Through the anti-theft gates"></a><br><sub>Through the anti-theft gates</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/walls.jpg"><img src="docs/screenshots/walls.jpg" alt="New releases, wall to wall"></a><br><sub>New releases, wall to wall</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/shelf.jpg"><img src="docs/screenshots/shelf.jpg" alt="Your library, on the shelf"></a><br><sub>Your library, on the shelf</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/tape.jpg"><img src="docs/screenshots/tape.jpg" alt="Hold a tape up and read it"></a><br><sub>Hold a tape up and read it</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/staff-picks.jpg"><img src="docs/screenshots/staff-picks.jpg" alt="Staff Picks: your best rated"></a><br><sub>Staff Picks: your best rated</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/counter.jpg"><img src="docs/screenshots/counter.jpg" alt="The counter"></a><br><sub>The counter</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/behind-counter.jpg"><img src="docs/screenshots/behind-counter.jpg" alt="Your side of it"></a><br><sub>Your side of it</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/register.jpg"><img src="docs/screenshots/register.jpg" alt="The register's DOS terminal"></a><br><sub>The register's DOS terminal</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/breakroom.jpg"><img src="docs/screenshots/breakroom.jpg" alt="The break room"></a><br><sub>The break room</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/lounge.jpg"><img src="docs/screenshots/lounge.jpg" alt="The TV lounge"></a><br><sub>The TV lounge</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/lobby.jpg"><img src="docs/screenshots/lobby.jpg" alt="The theater lobby"></a><br><sub>The theater lobby</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/theater.jpg"><img src="docs/screenshots/theater.jpg" alt="The auditorium"></a><br><sub>The auditorium</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/tony-out.jpg"><img src="docs/screenshots/tony-out.jpg" alt="Tony's Pizza"></a><br><sub>Tony's Pizza</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/tony-in.jpg"><img src="docs/screenshots/tony-in.jpg" alt="Slices and cabinets"></a><br><sub>Slices and cabinets</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/arcade.jpg"><img src="docs/screenshots/arcade.jpg" alt="Quarters not included"></a><br><sub>Quarters not included</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/screenshots/golf.jpg"><img src="docs/screenshots/golf.jpg" alt="Golf. On the roof. Sure."></a><br><sub>Golf. On the roof. Sure.</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/together.jpg"><img src="docs/screenshots/together.jpg" alt="Your friend, in the store"></a><br><sub>Your friend, in the store</sub></td>
+    <td align="center" width="33%"><a href="docs/screenshots/menu.jpg"><img src="docs/screenshots/menu.jpg" alt="Three save files, like a cartridge"></a><br><sub>Three save files, like a cartridge</sub></td>
+  </tr>
+</table>
+
+<sub>Everything's captured in-game. The movies and covers are made up for these screenshots: yours will be from your own library.</sub>
+
+## ⌨️ Controls
+
+| Key | Action | | Key | Action |
+|---|---|---|---|---|
+| **W A S D** | Walk | | **E** | Interact |
+| **Mouse** | Look | | **Click** | Pick up a tape, take a bite |
+| **Shift** | Hustle | | **B** | Play or pause the tape |
+| **C** | Crouch | | **F** (hold) | Time and weather wheel |
+| **Space** | Jump | | **H** | Hide the HUD |
+
+<details>
+<summary><b>All controls</b></summary>
 
 | Key | Action |
 |---|---|
@@ -108,16 +220,45 @@ Three save files, like an old cartridge: pick one to **play**, **copy** or **del
 | **B** | Play or pause the tape in the TV |
 | **V / N** | Double-tap for the previous / next episode. Hold to rewind / fast-forward, with a scrub bar in the corner showing where you are |
 | **K** | Character sheet: your skills and the staff's, with XP toward the next level |
-| **F** | Hold for the time and weather wheel: aim with the mouse, click to choose, right-click or Esc to cancel |
+| **F** | Hold for the time and weather wheel (fullscreen is your browser's **F11**): aim with the mouse, click to choose, right-click or Esc to cancel |
 | **H** | Hide the HUD |
 | **M** | Store sounds on/off (fluorescent hum, air, traffic outside, the door chime, footsteps, doors, the cooler) |
 | **J** | Show or hide the log (bottom left) · **PgUp / PgDn** scroll it |
 | **1–5** | When you've caught a shoplifter: ban a week / a month, cancel their membership, call the police, or let them off with a warning |
-| **F** | Fullscreen |
+
+</details>
+
+## 🔧 Under the hood
+
+<details>
+<summary><b>How your library goes on the shelves</b></summary>
+
+- **Sections** come from each title's Jellyfin genres, best fit first (see `placeMovie` and `placeSeries` in `jellyfin.js`).
+- **The walls** (new releases) get your newer movies. The oldest 15% or so go on the classics shelves in the middle, and TV goes on the shelving east of the walkway. Kids' titles go by the windows, judged from genres and rating.
+- **Classic Horror** is its own shelf with its own sign: your best-rated pre-2000 horror films, if you have at least 11. Otherwise that shelf isn't there.
+- **Staff Picks** and the wall posters are your best-rated titles.
+- **Room:** the store holds about 3,000 tapes. Past that, the lowest rated are left out, and SETTINGS tells you how many.
+- **Spare room** is filled with extra copies, so a small library still fills the store.
+
+</details>
+
+<details>
+<summary><b>What goes back to your server</b></summary>
+
+Playing a tape tells Jellyfin like any other client (started, progress, stopped), so **watching in the game counts as watching on your account**: resume points and played status can change. Customers renting tapes in the game don't touch your server. The game's tape position is its own: a tape plays from wherever it's wound to in the game, not from your Jellyfin resume point.
+
+Files your browser can play (mp4 or webm with browser-friendly codecs) play directly. Anything else (mkv, HEVC where unsupported, AC3/DTS audio) is remuxed or transcoded by your server as HLS, which uses its CPU or GPU.
 
 ---
 
-## How it's put together
+**It's 7:25 on a Friday night, there's a line at the counter, somebody by the door has a tape under their jacket, and the store is yours.**
+
+JellyBuster is a first-person shift at a neighborhood video store in the 90s. You're the one behind the counter. You work the register, keep the place running, and turn a half-empty storefront into the store everybody in town goes to on a Friday night.
+
+</details>
+
+<details>
+<summary><b>How it's put together, and running the tests</b></summary>
 
 To run it locally, open `index.html` in a browser. It works straight from `file://` with no server; you just need an internet connection, because three.js loads from a CDN.
 
@@ -153,17 +294,19 @@ Everything runs as plain `<script>` files loaded in order. There are no ES modul
 | `store/tv.js` | Holding a tape up, the store TV |
 | `store/title.js` | The title screen and pointer lock, the register hookup, the gate alarm, clocking out |
 | `store/customer-mode.js` | Customer mode |
+| `store/together.js` | Playing together: pairing through Jellyfin, the direct link, the other player, guests, the shared time and weather |
 | `store/main.js` | Save and restore, the main loop, room culling, loading |
 | `couch.js` | The procedurally built parlor sofa |
 | `pos.js` | The register's DOS-style POS terminal |
 | `ambience.js` | The store's ambient sound, modelled from the physics of each source rather than recorded: ballast hum, room tone, Doppler-shifted traffic through the glass, the entry chime, footsteps, latches and hinges, swing doors, the cooler's door and compressor |
 | `jellyfin.js` | The link to your server: the sign-in form, the library as tapes on shelves (`window.STORE_CATALOG`, `STORE_META`, `STORE_POSTERS`), and playing (direct or HLS, reporting back) |
+| `JellyBusterLink/index.html` | A standalone page for checking two devices can connect directly |
 | `tests/smoke.mjs` | The smoke tests (see Testing) |
 | `tests/jellyfin.mjs` | The link: signing in, the library as stock, playing, and libraries tiny and too big |
 | `tests/mock-jellyfin.mjs` | The stand-in Jellyfin those tests run against (it needs `ffmpeg` to make its test video) |
 | `tests/shot.mjs` | A screenshot (or frame timing) from anywhere in a fresh store |
 
-### Testing
+#### Testing
 
 `tests/smoke.mjs` loads the game headless from `file://` and drives each system through its test hooks: the menu and save files, a full checkout, restocking, a phone hold, moving counter gear, save/reload, the restroom, and a fresh Simulation store: hiring and schedules, skill milestones, the rewinder upgrades, staff clocking out, members' visiting rhythm, day goals, the janitor's closet and the register's sale screen; then a Customer store: in off the lot, paying, getting caught, and a key that keeps through a reload. It needs Node and a Chromium:
 
@@ -179,3 +322,18 @@ To look at something, `tests/shot.mjs` puts you at a spot and takes a screenshot
 node tests/shot.mjs closet.png 10.3,29.1,-1.7,0.1 --setup "__t.setZone('closet', true)"
 node tests/shot.mjs - 3,12,3.14,0 --mode simulation --gpu --fps
 ```
+
+</details>
+
+---
+
+<div align="center">
+
+**BE KIND. REWIND.**
+
+[MIT licensed](LICENSE). Use it, change it, share it: just keep the license notice.<br>
+A fan-made game, not affiliated with Jellyfin or any video store chain.
+
+*If you like it, tell someone who used to work behind a counter.*
+
+</div>
