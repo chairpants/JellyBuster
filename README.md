@@ -4,11 +4,11 @@
 
 ### A first-person 90s video store, stocked from **your own** Jellyfin library.
 
-![three.js](https://img.shields.io/badge/three.js-r170-1b3fa0?style=flat-square)
-![Jellyfin](https://img.shields.io/badge/Jellyfin-your%20library-ffd400?style=flat-square&labelColor=1b3fa0)
-![No build](https://img.shields.io/badge/build%20step-none-1b3fa0?style=flat-square)
-![Co-op](https://img.shields.io/badge/co--op-same%20network-ffd400?style=flat-square&labelColor=1b3fa0)
-![License: MIT](https://img.shields.io/badge/license-MIT-1b3fa0?style=flat-square)
+[![three.js](https://img.shields.io/badge/three.js-r170-1b3fa0?style=flat-square)](https://threejs.org)
+[![Jellyfin](https://img.shields.io/badge/Jellyfin-your%20library-ffd400?style=flat-square&labelColor=1b3fa0)](https://jellyfin.org)
+[![No build](https://img.shields.io/badge/build%20step-none-1b3fa0?style=flat-square)](#%EF%B8%8F-play-now)
+[![Co-op](https://img.shields.io/badge/co--op-same%20network-ffd400?style=flat-square&labelColor=1b3fa0)](#-play-together)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1b3fa0?style=flat-square)](LICENSE)
 
 [Play now](#%EF%B8%8F-play-now) · [Your library](#-your-library-on-actual-shelves) · [The job](#-work-the-shift) · [Play together](#-play-together) · [Screenshots](#-take-the-tour) · [Controls](#%EF%B8%8F-controls) · [Under the hood](#-under-the-hood)
 
