@@ -27,8 +27,7 @@
 3. **Link your Jellyfin:** enter your server's address (like `http://your-server:8096`) and sign in, or use **Quick Connect**.
 4. **Pick a store** and clock in. It runs with keyboard and mouse, or on a touchscreen.
 
-> [!NOTE]
-> You need an internet connection, because three.js and hls.js load from a CDN.
+No internet needed: everything the game loads is in the folder. You just need to reach your Jellyfin server.
 
 > [!IMPORTANT]
 > **Don't host it on https** (GitHub Pages, say) if your server is plain http: browsers block an https page from reaching an http server. Open the file locally, or put Jellyfin behind https.
@@ -260,9 +259,9 @@ JellyBuster is a first-person shift at a neighborhood video store in the 90s. Yo
 <details>
 <summary><b>How it's put together, and running the tests</b></summary>
 
-To run it locally, open `index.html` in a browser. It works straight from `file://` with no server; you just need an internet connection, because three.js loads from a CDN.
+To run it locally, open `index.html` in a browser. It works straight from `file://` with no server and no internet: three.js, hls.js and the register's font are all in `vendor/`.
 
-Everything runs as plain `<script>` files loaded in order. There are no ES modules, so the page works from `file://`. The one exception is a small inline module in `index.html` that imports three.js and its post-processing add-ons from the CDN, puts them on `window`, and then loads the game itself, the files in `store/` (JellyBuster itself, and the game's rules), `tonys/` (the pizza place next door) and `exterior/` (the lot, the grounds, the sky), in order. They are one program cut into sections, not modules: they share one scope, and the order (the list in `index.html`) matters, because each file runs as it loads and can only use what earlier files have already made.
+Everything runs as plain `<script>` files loaded in order. There are no ES modules, so the page works from `file://`. Three.js and its add-ons are bundled once into `vendor/three.js`, and `npm run vendor` rebuilds that, only needed to change its version. A small inline script in `index.html` waits for Jellyfin and then loads the game itself, the files in `store/` (JellyBuster itself, and the game's rules), `tonys/` (the pizza place next door) and `exterior/` (the lot, the grounds, the sky), in order. They are one program cut into sections, not modules: they share one scope, and the order (the list in `index.html`) matters, because each file runs as it loads and can only use what earlier files have already made.
 
 | File | What it is |
 |---|---|
@@ -301,6 +300,7 @@ Everything runs as plain `<script>` files loaded in order. There are no ES modul
 | `ambience.js` | The store's ambient sound, modelled from the physics of each source rather than recorded: ballast hum, room tone, Doppler-shifted traffic through the glass, the entry chime, footsteps, latches and hinges, swing doors, the cooler's door and compressor |
 | `jellyfin.js` | The link to your server: the sign-in form, the library as tapes on shelves (`window.STORE_CATALOG`, `STORE_META`, `STORE_POSTERS`), and playing (direct or HLS, reporting back) |
 | `JellyBusterLink/index.html` | A standalone page for checking two devices can connect directly |
+| `vendor/` | three.js, hls.js and the VT323 font, with their licenses |
 | `tests/smoke.mjs` | The smoke tests (see Testing) |
 | `tests/jellyfin.mjs` | The link: signing in, the library as stock, playing, and libraries tiny and too big |
 | `tests/mock-jellyfin.mjs` | The stand-in Jellyfin those tests run against (it needs `ffmpeg` to make its test video) |
@@ -331,7 +331,7 @@ node tests/shot.mjs - 3,12,3.14,0 --mode simulation --gpu --fps
 
 **BE KIND. REWIND.**
 
-[MIT licensed](LICENSE). Use it, change it, share it: just keep the license notice.<br>
+[MIT licensed](LICENSE). Use it, change it, share it: just keep the license notice. Bundled libraries keep their own licenses, in `vendor/`.<br>
 A fan-made game, not affiliated with Jellyfin or any video store chain.
 
 *If you like it, tell someone who used to work behind a counter.*

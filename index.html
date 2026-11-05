@@ -4,9 +4,8 @@
 <meta charset="utf8">
 <title>JellyBuster</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">  <!-- the register terminal's font (pos.js) -->
 <style>
+  @font-face { font-family: "VT323"; src: url(vendor/VT323.woff2) format("woff2"); font-display: swap; }   /* the register terminal's font (pos.js) */
   :root { --bb-blue: #00349c; --bb-blue-dark: #001f5c; --bb-yellow: #ffd400; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; background: #000;
@@ -385,13 +384,8 @@
   <video id="vid" crossorigin="anonymous" playsinline></video>
 
 
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-} }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>  <!-- what the browser can't play straight off the server comes as HLS -->
+<script src="vendor/three.js"></script>   <!-- three.js and its add-ons, as one plain script (see vendor/three-entry.js) -->
+<script src="vendor/hls.min.js"></script>  <!-- what the browser can't play straight off the server comes as HLS -->
 <script src="jellyfin.js"></script>  <!-- window.Jelly: the link to your Jellyfin, and the store's stock (window.STORE_CATALOG) -->
 <script src="cutout.js"></script>       <!-- embedded: the Dracula standee -->
 <script src="customers.js"></script>  <!-- window.StoreCustomers: TV-head customers, built from store/ -->
@@ -401,17 +395,7 @@
 <script src="ambience.js"></script>  <!-- window.StoreAmbience: the store's sound (hum, room tone, traffic, chime, footsteps), modelled not recorded -->
 <script src="touch.js"></script>     <!-- touchscreen controls on phones / tablets (?touch=1 to force) -->
 <script type="module">
-  // file:// can't load local files as ES modules, so: import three from the CDN
-  // here (https CORS is fine), expose the globals, then load the game (store/, tonys/, exterior/:
-  // one shared scope, in this order) as classic scripts — which file:// happily allows.
-  import * as THREE from "three";
-  import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-  import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-  import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
-  import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-  window.THREE = THREE; window.mergeGeometries = mergeGeometries;
-  window.UnrealBloomPass = UnrealBloomPass; window.ShaderPass = ShaderPass;
-  window.OutputPass = OutputPass;
+  // load the game (store/, tonys/, exterior/: one shared scope, in this order) as classic scripts, which file:// allows.
   await window.Jelly.ready;   // linked, and the library's in: the game reads its stock as it loads
   // Keys and the mouse wait for the last file: a handler from one file can't run before the files after it are in.
   const INPUT = ["keydown", "keyup", "mousemove", "mousedown", "mouseup", "click", "wheel", "contextmenu"], hold = e => e.stopImmediatePropagation();

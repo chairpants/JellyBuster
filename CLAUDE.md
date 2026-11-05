@@ -1,6 +1,6 @@
 # JellyBuster
 
-A first-person 90s video store in three.js, stocked from the player's own Jellyfin server. No build: `index.html` loads plain scripts, and it has to keep working from `file://`. The game doesn't load until `Jelly.ready` (`jellyfin.js`): it reads its stock while it loads.
+A first-person 90s video store in three.js, stocked from the player's own Jellyfin server. No build: `index.html` loads plain scripts, and it has to keep working from `file://`, with no internet: three.js, hls.js and the register's font are in `vendor/` (`npm run vendor` rebuilds `vendor/three.js`, only needed to change its version). The game doesn't load until `Jelly.ready` (`jellyfin.js`): it reads its stock while it loads.
 
 ## How the game's code is laid out
 

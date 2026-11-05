@@ -29,7 +29,7 @@ window.createPOS = function createPOS(api) {
   const COLS = 80, ROWS = 30;
   // DOS-app palette: blue screen, light grey text, bright white values, cyan
   // labels and frames, yellow headings, green money, red warnings; a grey bar
-  // for the selection. VT323 (Google Fonts, loaded in index.html) with a
+  // for the selection. VT323 (vendor/, loaded in index.html) with a
   // monospace fallback offline
   const P = { bg: "#0000aa", fg: "#c8c8d8", hi: "#ffffff", yel: "#ffff55", cyan: "#55ffff", dcyan: "#00aaaa", grn: "#55ff55", red: "#ff5555",
     gray: "#8a8ad0", blk: "#000000", deep: "#000077", shadow: "#000044", sel: "#c8c8d8" };
