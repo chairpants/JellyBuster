@@ -386,7 +386,7 @@ renderer.setAnimationLoop(() => {
   }
   else if (seated) camera.position.copy(me.rig.head.getWorldPosition(meEye)).add(meEye.set(Math.sin(seatAt.ry || 0) * 0.06, 0.03, Math.cos(seatAt.ry || 0) * 0.06));   // eyes just above the collar, a touch forward
   else {
-    eyeY += ((keys.has("KeyC") ? 1.06 : 1.65) - eyeY) * Math.min(1, dt * 10);   // crouched: just above the squatting body's collar
+    eyeY = fall ? fallEye() : eyeY + (Math.min(keys.has("KeyC") ? 1.06 : 1.65, eyeRoom()) - eyeY) * Math.min(1, dt * 10);   // crouched: just above the squatting body's collar
     camera.position.set(player.x, eyeY - jump.dip + playerFloor(), player.z);
   }
   if (!seated) seatFov = 70;                     // walking resets the couch zoom
@@ -397,7 +397,7 @@ renderer.setAnimationLoop(() => {
   }
   const dk = dizzyTick(dt);
   camera.rotation.y = player.yaw; camera.rotation.x = player.pitch + dk * 0.04 * Math.sin(dizzy.t * 2.1);
-  camera.rotation.z = dk * 0.09 * Math.sin(dizzy.t * 1.3);   // the world tipping side to side
+  camera.rotation.z = dk * 0.09 * Math.sin(dizzy.t * 1.3) + (fall ? fall.roll * 0.3 * fall.tilt : 0);   // the world tipping side to side; down, your head on one side
   invSync();
   cutoutCarryTick();
   stoolCarryTick();

@@ -234,7 +234,7 @@ function setLamp(l, on) {
   l.userData.pool.visible = on;
 }
 function onE() {
-  if (scrub || ladder.fix || roof.climb) return;   // busy mopping / sweeping / up at a light / on the roof ladder
+  if (fall || scrub || ladder.fix || roof.climb) return;   // (flat on your back) busy mopping / sweeping / up at a light / on the roof ladder
   if (CUSTOMER && !seated && !player.onRoof && cmE()) return;   // as a customer: the staff, the locked doors, the register (see cmE)
   if (golf.on) { if (golf.st === "idle") golfEnd(); return; }
   if (aimRoofLadder) { roofClimb(player.onRoof ? -1 : 1); return; }

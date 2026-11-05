@@ -771,6 +771,7 @@ const wallSpans = [];                        // what the wall runs cover, for li
     ["CLASSICS", (westEnd - CENTER.corridor) / 2, CENTER.z0 + classicsFrom * bandStep - 0.5, 2.6],
     ["TV SHOWS", (eastEnd + CENTER.corridor) / 2, CENTER.z0 - 0.5, 2.6],
   ]) {
+    hangers.push({ x0: x - w / 2, x1: x + w / 2, z0: z - 0.08, z1: z + 0.08, y0: 2.65, y1: 3.25, name: txt });
     const tex = textPlane(txt, w, 0.6).material.map;
     const signMat = new THREE.MeshLambertMaterial({ map: tex });
     const front = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.6), signMat);

@@ -37,7 +37,8 @@
   }
   const api = (path, opts) => call(link.url, link.token, path, opts);
   function unreachable(base, e) {
-    if (location.protocol === "https:" && base.startsWith("http:")) return `This page is https and ${base} isn't, so the browser won't let them talk. Open index.html from your own computer instead.`;
+    // (Whether an https page may reach an http server depends on the browser, and a failed fetch doesn't say why it failed: so, what to try)
+    if (location.protocol === "https:" && base.startsWith("http:")) return `Can't reach ${base}. This page is https and that address is http, which some browsers block. To check, open ${base} in a new tab. If Jellyfin loads, this browser is blocking the game: run your own copy of it instead of this page. If it doesn't load, check the address, and that this device is on the same network.`;
     return e?.name === "TimeoutError" ? `${base} took too long to answer.` : `Can't reach ${base}. Is the address right, and is Jellyfin running?`;
   }
   const cleanAddress = a => {

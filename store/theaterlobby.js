@@ -80,14 +80,17 @@ const nowPlaying = { shown: undefined, poster: null, plate: null, ctx: null };
   for (const x of [CASE0, CASE1]) bx(0.02, CH - 0.14, 0.02, gold, x, 0.14 + (CH - 0.14) / 2, FRONT);
   // on the counter: the register, a hot dog roller, the napkins and straws, sleeves of cups
   const TOP = CH + 0.046;
-  { const g = new THREE.Group(); g.position.set(-7.0, TOP, CZ); g.rotation.y = Math.PI + 0.25 + Math.PI; scene.add(g);   // the register, turned to whoever's behind it... and to you
+  { const g = new THREE.Group(); g.position.set(-7.0, TOP, CZ); g.rotation.y = Math.PI + 0.25; scene.add(g);   // the register: its local +z is the side you work it from, behind the counter
     const beige = lam(0xc9c2ad), dark = lam(0x2b2d30);
     bx(0.38, 0.11, 0.4, beige, 0, 0.055, 0, g); bx(0.36, 0.015, 0.3, dark, 0, 0.115, 0.02, g);     // the drawer, its keytop
-    const slope = bx(0.34, 0.19, 0.03, beige, 0, 0.19, -0.11, g); slope.rotation.x = 0.5;
+    const TILT = -0.95, slope = bx(0.34, 0.19, 0.03, beige, 0, 0.17, -0.1, g); slope.rotation.x = TILT;   // the sloped front, leaning back: the keys face up at you
     const keys = canvasMat(128, 96, (c, W, Hh) => { c.fillStyle = "#3a3d40"; c.fillRect(0, 0, W, Hh); for (let y = 0; y < 4; y++) for (let x = 0; x < 5; x++) { c.fillStyle = x > 3 ? "#d04a2a" : "#e6e2d4"; c.fillRect(8 + x * 23, 8 + y * 21, 18, 16); } });
-    const kp = plane(0.28, 0.14, keys, 0, 0.19, -0.092, 0, g); kp.rotation.x = 0.5 - Math.PI / 2 + Math.PI / 2;
-    bx(0.2, 0.06, 0.07, dark, 0, 0.32, -0.15, g);                                                  // the display, over the keys
-    plane(0.17, 0.035, new THREE.MeshBasicMaterial({ color: 0x4dff7a }), 0, 0.32, -0.114, 0, g);
+    const kp = plane(0.28, 0.14, keys, 0, 0.17 + 0.017 * Math.cos(TILT + Math.PI / 2), -0.1 + 0.017 * Math.cos(TILT), 0, g); kp.rotation.x = TILT;
+    bx(0.05, 0.08, 0.05, beige, 0, 0.255, -0.17, g);                                               // the display, on a neck over the keys
+    bx(0.2, 0.06, 0.07, dark, 0, 0.32, -0.17, g);
+    const readout = new THREE.MeshBasicMaterial({ color: 0x4dff7a });
+    plane(0.17, 0.035, readout, 0, 0.32, -0.134, 0, g);                                            // yours, and on its back a smaller one for the customer to see the total
+    plane(0.11, 0.03, readout, 0, 0.32, -0.206, Math.PI, g);
     bx(0.08, 0.03, 0.09, lam(0xefefe6), 0.12, 0.13, 0.13, g);                                      // the paper roll
   }
   { const R = -5.05, g = new THREE.Group(); g.position.set(R, TOP, CZ - 0.04); scene.add(g);       // the hot dog roller: steel, a row of rollers, dogs on them, a sneeze guard

@@ -927,6 +927,7 @@ const aimables = [];                       // E targets: TV screen, couch, lamps
 const aimBlockers = [];                    // solid things you can't reach through: walls, the back of a snack rack
 const lampPools = [];                      // side-lamp floor pools — drowned out whenever the overhead lights are on
 const lamps = [];                          // the two side lamps — holding L toggles both together
+const hangers = [];                        // what hangs at head height if you're up on something: { x0, x1, z0, z1, y0, y1, name } (see hangerHit)
 const colliders = [];                      // axis-aligned floor boxes the player can't walk into — walls included
 // the Dracula standee: where it stands (x, z, facing ry), its mesh group once
 // the PNG has loaded, and its collider — one box, refit wherever it's set down

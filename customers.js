@@ -28,12 +28,15 @@
 //     reachTo(point|null, arm, {lean}),  put a hand on a world point (eased); null lets go
 //     reachAlso(point|null, arm),  the other hand too, arm only (both hands on a mop handle); null lets go
 //     talk(bool),         conversational head motion
+//     setBend(legs, armA, armB),  folds round what's in the way, down on the floor: legs: how far (m, hip to foot) they've got, null = all the way; 0..1, an arm in to the chest
+//     setAir(bool),       off the ground: the legs push off, tuck, reach for the floor, and take the landing when it goes false
 //     tick(dt, speed),    animate; speed = m/s along the ground (0 = standing)
 //     walkLean,           true: tip forward into the walk (the player's own body turns it off)
 //     dispose(),          frees the face canvas texture (materials are shared: kept)
 //   }
 // }
 window.StoreCustomers = (() => {
+  const JUMP_AIR = 0.63, JUMP_LAND = 0.28;           // s: a jump's time off the ground (see JUMP, store/player.js), and how long the knees take the landing
   // ---- wardrobe: every outfit is picked from these ----
   // The 90s were loud: neon and jewel tones, color-blocking, prints, tie-dye, with some grunge flannel and denim
   // for balance. Boys and girls draw from their own racks (tops, bottoms, sleeves, trims, hats), so the cuts read
@@ -874,7 +877,10 @@ window.StoreCustomers = (() => {
     let gait = GAITS[o.gait] ? o.gait : "plain";
     // the weather on them (see setWind etc.) and one-off moves: shake (snow/water off at the door), slip (a wet floor),
     // feel (a palm out: is that rain?), stagger (shoved by a gust), flip (a gust turns the umbrella inside out)
-    const env = { wx: 0, wz: 0, hunch: 0, shield: false, snow: 0 }, fx = { shake: 0, slip: 0, feel: 0, stagger: 0, sdir: 1, flip: 0 };
+    const env = { wx: 0, wz: 0, hunch: 0, shield: false, snow: 0 }, fx = { shake: 0, slip: 0, feel: 0, stagger: 0, sdir: 1, flip: 0, land: 0 };
+    let air = false, airT = 0;                         // off the ground (see setAir)
+    const foldTo = { legs: null, arm0: 0, arm1: 0 };   // (see setBend)
+    const bendNow = { k: 0, a0: 0, a1: 0 }, ease_bend = (k, v, dt) => { bendNow[k] += (v - bendNow[k]) * Math.min(1, dt * 14); return bendNow[k] < 0.002 ? 0 : bendNow[k]; };
     const qTilt = new THREE.Quaternion(), eTilt = new THREE.Euler();
     const g2 = fc.getContext("2d");
     drawFace(g2, face, 0); ftex.needsUpdate = true;
@@ -912,12 +918,18 @@ window.StoreCustomers = (() => {
       setHunch(k) { env.hunch = k; },                // cold / wet: shoulders up, arms in, head down, shorter steps
       setShield(on) { env.shield = on; },            // a hand up over the head (caught in the rain, no umbrella)
       setSnow(k) { k = Math.max(0, Math.min(1, k)); if (Math.abs(k - env.snow) > 0.004 || (k === 0) !== (env.snow === 0)) { env.snow = k; setSnowK(k); } },   // 0..1 settled on the head and shoulders
+      setBend(legs = null, arm0 = 0, arm1 = 0) { foldTo.legs = legs; foldTo.arm0 = arm0; foldTo.arm1 = arm1; },
+      setAir(on) { if (on && !air) airT = 0; else if (!on && air) fx.land = JUMP_LAND; air = on; },
       shake() { fx.shake = 1; }, slip() { fx.slip = 1.1; }, feelRain() { fx.feel = 1.8; },
       stagger(dir = 1) { if (fx.stagger <= 0) { fx.stagger = 0.9; fx.sdir = dir; } },   // dir: +1 shoved to their left, -1 to their right
       umbrellaFlip() { if (props.umbrella.visible && fx.flip <= 0) fx.flip = 1.6; },
       get busy() { return fx.slip > 0 || fx.shake > 0.3; },   // mid-slip / shaking off: the store holds them in place
       tick(dt, speed = 0) {
         t += dt;
+        if (air) { airT += dt; speed = 0; }             // (no walking on air)
+        const tuck = st.tuck = (st.tuck || 0) + ((air ? Math.sin(Math.PI * Math.min(1, airT / JUMP_AIR)) : 0) - (st.tuck || 0)) * Math.min(1, dt * 16);   // straight off the floor, knees up at the top, straight again to meet it
+        const landK = fx.land > 0 ? Math.sin(Math.PI * fx.land / JUMP_LAND) : 0;   // the knees taking it
+        const legFold = ease_bend("k", foldTo.legs == null ? 0 : Math.acos(Math.max(0.3, Math.min(1, foldTo.legs / 0.9))), dt), arm0K = ease_bend("a0", foldTo.arm0, dt), arm1K = ease_bend("a1", foldTo.arm1, dt);   // the two-bone leg: thigh up by this, knee by twice it, and the foot's that much nearer the hip, on the same line
         // walk cycle: stride advances with ground speed, so feet don't skate
         // the legs lead: step rate follows ground speed, but a faster walker also
         // lengthens their stride, so cadence climbs slower than speed (feet still plant)
@@ -979,15 +991,15 @@ window.StoreCustomers = (() => {
         legs.forEach(({ hip, knee }, i) => {
           const hx = sit ? -Math.PI / 2 : walking ? -gl[i][0] : 0, kx = sit ? Math.PI / 2 + (sitAt.tuck ?? 0) : walking ? gl[i][1] : 0;   // (thigh forward is -x)
           const lr = walking && !sit ? 1 : r;           // walking: exactly where the cycle puts them (easing lags, and the feet skate); eased into and out of it
-          hip.rotation.x = ease("h" + i, hx - (i ? 0 : slipK * 0.6), lr) - crouch * 1.05 - squat * 1.6;   // (and a foot shoots out on a slip)
-          knee.rotation.x = ease("k" + i, kx, lr) + crouch * 1.9 + squat * 2.4;
+          hip.rotation.x = ease("h" + i, hx - (i ? 0 : slipK * 0.6), lr) - crouch * 1.05 - squat * 1.6 - tuck * (i ? 0.45 : 0.95) - landK * 0.6 - legFold;   // (one knee leads: nobody hops with their feet together)   // (and a foot shoots out on a slip)
+          knee.rotation.x = ease("k" + i, kx, lr) + crouch * 1.9 + squat * 2.4 + tuck * (i ? 0.9 : 1.35) + landK + legFold * 2;
         });
         const seatY = sit ? (sitAt.hipY ?? 0.5) - 0.9 * o.height : 0;   // hips down to the seat
         const jolt = face.mood === "shock" && t - face.since < 0.35 ? Math.sin((t - face.since) / 0.35 * Math.PI) * 0.06 : 0;   // a little jump
         const bob = walking ? legBob + (run ? run * 0.03 * Math.abs(Math.sin(phase)) : 0) + (G.hop && !run ? Math.max(0, Math.sin(phase)) ** 2 * 0.06 : 0) : 0;   // on the planted leg (in a run's flight, up off it; a skip: a little hop off every other step)
         const bodyY = seatY + jolt + bob - slipK * 0.08;   // hips rise over each planted foot
         st.y += (bodyY - st.y) * (Math.abs(bodyY - st.y) > 0.05 ? r : 1);   // eased sitting down / getting up, bob tracked directly
-        body.position.y = st.y - crouch * 0.4 - squat * 0.6;
+        body.position.y = st.y - crouch * 0.4 - squat * 0.6 - landK * 0.115;   // (as far as those knees bend take it: the feet stay on the floor)
         body.position.z = step;
         body.position.x = stagK * 0.12 * fx.sdir;         // a gust shoves them a step sideways
         const sg = sighT > 0 ? Math.sin((1 - (sighT -= dt) / 1.3) * Math.PI) : 0;    // a sigh: up, then a long sag
@@ -1018,9 +1030,11 @@ window.StoreCustomers = (() => {
         else if (env.shield) { lx = -2.75; le = -0.95; }                              // a hand up over the head against the rain
         if (feelK) { rx += (-1.15 - rx) * feelK; re += (-0.3 - re) * feelK; }          // palm out: is that rain?
         if (shakeK) { const k = shakeK; lx += (-1.0 - lx) * k; le += (-1.75 + Math.sin(t * 24) * 0.25 - le) * k; }   // brushing it off the shoulders
+        if (free && (air || landK)) { const k = Math.max(tuck, landK * 0.5); lx += (-1.1 - lx) * k; rx += (-0.7 - rx) * k; le += (-0.75 - le) * k; re += (-0.95 - re) * k; }   // arms up for balance
+        if (arm0K) { lx += (-1.15 - lx) * arm0K; le += (-2.2 - le) * arm0K; } if (arm1K) { rx += (-1.15 - rx) * arm1K; re += (-2.2 - re) * arm1K; }   // in out of the way of something
         const ar = walking ? soft : r;                    // arms carry some momentum while walking; poses (reach, hold) still settle promptly
         const pose2 = [[ease("ax0", lx, ar), ease("ae0", le, ar)], [ease("ax1", rx, ar), ease("ae1", re, ar)]];
-        const flail = Math.max(slipK, stagK * 0.6);        // arms out for balance
+        const flail = Math.max(slipK, stagK * 0.6, free ? tuck * 0.32 : 0);        // arms out for balance
         arms.forEach(({ sh, el }, i) => { sh.rotation.set(pose2[i][0] - flail * 0.4, 0, (i ? -0.06 : 0.06) + flail * (i ? -1.2 : 1.2) * (1 + Math.sin(t * 15 + i) * 0.15)); el.rotation.x = pose2[i][1]; });
         const armIK = (armI, target, w) => {             // two-bone IK: elbow from the law of cosines, shoulder swung to aim the chain
           const { sh, el } = arms[armI];

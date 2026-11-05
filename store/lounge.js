@@ -377,7 +377,7 @@ const crtGlows = [];                       // one real light per ceiling CRT clu
       const tb = add(new THREE.BoxGeometry(TAPE.d, TAPE.w, TAPE.h), new THREE.MeshLambertMaterial({ color: c }), x, 0.084 + TAPE.w / 2 + k * TAPE.w, 0.01);
       tb.rotation.y = r;
     });
-    colliders.push({ x0: -W / 2 - 0.03, x1: W / 2 + 0.03, z0: zc - D / 2 - 0.03, z1: zc + D / 2, shadow: false });   // TV_PROXIES shape its shadow instead
+    colliders.push({ x0: -W / 2 - 0.03, x1: W / 2 + 0.03, z0: zc - D / 2 - 0.03, z1: zc + D / 2, y1: H, shadow: false });   // TV_PROXIES shape its shadow instead
   }
   const couch = buildCouch();                                             // ornate orange sofa facing the TV (couch.js)
   const cs = 1.12;                                                        // model is built life-size; scaled up a touch (SEATS below match)
@@ -385,7 +385,7 @@ const crtGlows = [];                       // one real light per ceiling CRT clu
   couch.position.set(0, 0, TV.z - 3.89 - couch.userData.zRange[0] * cs); scene.add(couch);   // back edge stays at TV.z - 3.89
   const couchMeshes = couch.children.filter(c => c.isMesh);              // every mesh carries userData.sit
   { const [z0, z1] = couch.userData.zRange, w = couch.userData.footprint.w * cs;
-    colliders.push({ x0: -w / 2, x1: w / 2, z0: couch.position.z + z0 * cs, z1: couch.position.z + z1 * cs, shadow: false }); }
+    colliders.push({ x0: -w / 2, x1: w / 2, z0: couch.position.z + z0 * cs, z1: couch.position.z + z1 * cs, y1: 0.905 * cs, vaultOnly: true, shadow: false }); }   // (over it, not onto it: this box's top is the crest of its back, and there's no standing on that)
   const ps = textPlane("PREVIEW STATION", 1.2 * cs, 0.25 * cs);          // on the back of the couch
   const sg = couch.userData.sign;
   ps.position.set(0, sg.y * cs, couch.position.z + sg.z * cs); ps.rotation.set(sg.tilt, Math.PI, 0);

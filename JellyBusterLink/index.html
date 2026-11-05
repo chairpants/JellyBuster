@@ -424,13 +424,13 @@ $("signInForm").onsubmit = async e => {
   $("signInErr").hidden = true; $("signInBtn").disabled = true;
   const url = cleanAddress($("address").value);
   try {
-    if (location.protocol === "https:" && url.startsWith("http:")) throw new Error("This page is on https and that server isn't, so the browser won't let them talk. Open this file from your own device instead.");
     let res;
     try {
       res = await api("/Users/AuthenticateByName", { method: "POST", base: url, body: { Username: $("username").value.trim(), Pw: $("password").value } });
     } catch (err) {
       if (err.status === 401) throw new Error("That username or password wasn't right.");
       if (err.status) throw err;
+      if (location.protocol === "https:" && url.startsWith("http:")) throw new Error(`Can't reach ${url}. This page is https and that address is http, which some browsers block. To check, open ${url} in a new tab. If Jellyfin loads, this browser is blocking this page: open your own copy of it instead. If it doesn't load, check the address, and that this device is on the same network.`);
       throw new Error(`Can't reach ${url}. Is the address right, and is Jellyfin running?`);
     }
     S = { url, token: res.AccessToken, name: res.User?.Name || $("username").value.trim() };

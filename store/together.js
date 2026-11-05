@@ -172,8 +172,8 @@ function tgSend() {
   }
   const g = me.group.position, r = v => Math.round(v * 1000) / 1000;
   const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : null;
-  const pose = sit ? 2 : keys.has("KeyC") ? 1 : 0;
-  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, sit?.hipY ?? 0, sit?.tuck ?? 0])); } catch {}
+  const pose = fall ? 3 : sit ? 2 : keys.has("KeyC") ? 1 : 0;
+  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0])); } catch {}
 }
 function tgOnCtl(data, mine) {
   const T = together; if (mine !== T.try) return;
@@ -193,11 +193,13 @@ function tgOnCtl(data, mine) {
 function tgOnPos(data, mine) {
   const T = together, P = T.peer; if (mine !== T.try || !P) return;
   let a; try { a = JSON.parse(data); } catch { return; }
-  if (!Array.isArray(a) || a.length !== 7 || !a.every(Number.isFinite)) return;
+  if (!Array.isArray(a) || a.length !== 8 || !a.every(Number.isFinite)) return;
   P.heard = performance.now();
   if (Math.abs(a[0]) > 500 || Math.abs(a[1]) > 100 || Math.abs(a[2]) > 500) return;   // (nowhere in this world)
   P.to = { x: a[0], y: a[1], z: a[2], ry: a[3] };
-  if (a[4] !== P.pose || a[5] !== P.hipY || a[6] !== P.tuck) {
+  P.c.setAir(!!a[7]);
+  P.tilt = a[4] === 3 ? Math.max(0, Math.min(1, a[5])) : 0;   // (down on their back: see fall, store/player.js)
+  if (a[4] !== P.pose || (a[4] !== 3 && (a[5] !== P.hipY || a[6] !== P.tuck))) {
     P.pose = a[4]; P.hipY = a[5]; P.tuck = a[6];
     P.c.setPose(a[4] === 2 ? "sit" : a[4] === 1 ? "crouch" : "idle", a[4] === 2 ? { ...(a[5] && { hipY: a[5] }), ...(a[6] && { tuck: a[6] }) } : undefined);
   }
@@ -241,6 +243,10 @@ function togetherTick(dt) {                     // the main loop: eases them to 
   const T = together, P = T.peer; if (!P) return;
   if (performance.now() - P.heard > TOGETHER.silentFor) return tgLost();
   const g = P.c.group; if (!P.to) return;
+  g.rotation.order = "YXZ"; g.rotation.x += (-(P.tilt || 0) * Math.PI / 2 - g.rotation.x) * Math.min(1, dt * 12);
+  if (P.tilt > 0.4) {                            // (down: folded round what's there, in this copy of the store too. Their head's the far end from the feet)
+    const fx = Math.sin(P.to.ry), fz = Math.cos(P.to.ry), b = bodyBend(P.to.x - fx * FALL.long, P.to.z - fz * FALL.long, fx, fz, P.to.ry); P.c.setBend(b.legs, b.arm0, b.arm1);
+  } else P.c.setBend();
   const dx = P.to.x - g.position.x, dy = P.to.y - g.position.y, dz = P.to.z - g.position.z, d = Math.hypot(dx, dz);
   if (!g.visible || d > 6 || Math.abs(dy) > 3) {   // first seen, or they've gone further than anybody walks in a moment: no sliding over there
     g.position.set(P.to.x, P.to.y, P.to.z); P.ry = P.to.ry; g.visible = true; P.c.tick(dt, 0); return;
@@ -249,7 +255,7 @@ function togetherTick(dt) {                     // the main loop: eases them to 
   g.position.x += dx * k; g.position.y += dy * k; g.position.z += dz * k;
   P.ry += Math.atan2(Math.sin(P.to.ry - P.ry), Math.cos(P.to.ry - P.ry)) * k; g.rotation.y = P.ry;
   P.speed += (d * k / Math.max(dt, 1e-4) - P.speed) * Math.min(1, dt * 10);   // smoothed, or the legs flicker between updates
-  P.c.tick(dt, P.speed < 0.15 ? 0 : P.speed);
+  P.c.tick(dt, P.speed < 0.15 || P.tilt > 0.05 ? 0 : P.speed);
 }
 
 // ---- the menu: who's hosting, looked up only while it's on screen ----

@@ -224,7 +224,7 @@
   const ST_Z0 = 46.8, ST_Y = -0.95;
   box(TW - 0.2, ST_Y - PIT_Y, TZ1 - ST_Z0, stageWood, TX, (ST_Y + PIT_Y) / 2, (ST_Z0 + TZ1) / 2);
   box(TW - 0.16, 0.05, TZ1 - ST_Z0 + 0.06, brass, TX, ST_Y + 0.025, (ST_Z0 + TZ1) / 2);
-  colliders.push({ x0: TX0, x1: TX1, z0: ST_Z0 - 0.05, z1: TZ1, y0: PIT_Y, y1: ST_Y + 0.5 });
+  colliders.push({ x0: TX0, x1: TX1, z0: ST_Z0 - 0.05, z1: TZ1, y0: PIT_Y, y1: ST_Y });
 
   // the 6.84m x 4.56m screen (3:2, the video canvas's shape), its frame; the curtains either side out to the walls, the
   // valance over it, from just over the frame

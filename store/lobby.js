@@ -386,6 +386,7 @@ const GATE_Z = 4.0;                           // security gate line across the e
   // hanging CHECKOUT sign over the checkout run, two panels back to back on cables
   {
     const sx = -4.2, sy = 2.75, tex = textPlane("CHECKOUT", 1.6, 0.4).material.map, m = new THREE.MeshLambertMaterial({ map: tex });
+    hangers.push({ x0: sx - 0.8, x1: sx + 0.8, z0: 3.92, z1: 4.08, y0: sy - 0.2, y1: sy + 0.2, name: "CHECKOUT" });
     const f = put(new THREE.PlaneGeometry(1.6, 0.4), m, sx, sy, 4.005); const b = put(new THREE.PlaneGeometry(1.6, 0.4), m, sx, sy, 3.995); b.rotation.y = Math.PI;
     for (const cx of [sx - 0.6, sx + 0.6]) put(new THREE.CylinderGeometry(0.006, 0.006, STORE.h - sy - 0.2), mat.dark, cx, (STORE.h + sy + 0.2) / 2, 4);
   }
