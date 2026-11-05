@@ -10,7 +10,7 @@
 [![Co-op](https://img.shields.io/badge/co--op-same%20network-ffd400?style=flat-square&labelColor=1b3fa0)](#-play-together)
 [![License: MIT](https://img.shields.io/badge/license-MIT-1b3fa0?style=flat-square)](LICENSE)
 
-[Play now](#%EF%B8%8F-play-now) · [Your library](#-your-library-on-actual-shelves) · [The job](#-work-the-shift) · [Play together](#-play-together) · [Screenshots](#-take-the-tour) · [Controls](#%EF%B8%8F-controls) · [Under the hood](#-under-the-hood)
+[Play now](https://chairpants.github.io/JellyBuster/) · [Your library](#-your-library-on-actual-shelves) · [The job](#-work-the-shift) · [Play together](#-play-together) · [Screenshots](#-take-the-tour) · [Controls](#%EF%B8%8F-controls) · [Under the hood](#-under-the-hood)
 
 <img src="docs/screenshots/slideshow.webp" alt="A slideshow of the store, the register, the theater, Tony's arcade, the roof and the lot in snow" width="800">
 
