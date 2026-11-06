@@ -104,10 +104,26 @@ function tgClose() {
 function tgStop(status = "", bad = false) {     // back to not being connected to anybody
   const T = together;
   T.try++; T.state = "off"; tgClose(); tgLeaveGroup();
+  if (GUEST) {                                  // a guest with nobody to be the guest of: told so in the store, then back to their own menu, where it says why
+    toast(status || "The other player left", !bad); setTimeout(() => tgGuestLeaves(status || "The other player left.", bad), 4000);
+    return;
+  }
   tgStatus(status, bad); tgButtons(); tgLobby();
 }
+async function tgDiagnose(pc) {                // why it never came up, in a line: what each side offered, whether the other's address was found, whether anything answered
+  if (!pc) return "";
+  try {
+    const st = [...(await pc.getStats()).values()], by = t => st.filter(s => s.type === t);
+    const where = c => c.address || "(hidden)";
+    const local = by("local-candidate").map(c => `${c.candidateType} ${where(c)} ${c.protocol}`);
+    const remote = by("remote-candidate").map(c => `${c.candidateType} ${where(c)}`);
+    const pairs = by("candidate-pair"), sent = pairs.reduce((n, p) => n + (p.requestsSent || 0), 0), got = pairs.reduce((n, p) => n + (p.responsesReceived || 0) + (p.requestsReceived || 0), 0);
+    const states = [...new Set(pairs.map(p => p.state))].join("/") || "none";
+    return `[this device offered: ${local.join(", ") || "nothing"} · theirs, as found here: ${remote.join(", ") || "nothing"} · checks sent ${sent}, heard back ${got} · pairs ${states} · ice ${pc.iceConnectionState}]`;
+  } catch (e) { return `[no details: ${e.message}]`; }
+}
 function tgLost() {                             // the link's ended: it never came up, or it did and now it's gone
-  if (!together.up) return tgStop("Couldn't connect directly. Usual causes: a guest network or your router's AP isolation setting, a firewall blocking UDP, a VPN, or the other device being on another network.", true);
+  if (!together.up) { const T = together, mine = T.try; return void tgDiagnose(T.pc).then(d => { if (mine !== T.try) return; console.warn("Play together:", d); tgStop("Couldn't connect directly. Usual causes: a guest network or your router's AP isolation setting, a firewall blocking UDP, a VPN, or the other device being on another network. On a Mac, the browser needs Local Network access: System Settings, Privacy & Security, Local Network. " + d, true); }); }
   toast(together.peer ? `${together.peer.name} left` : "The other player left");
   tgStop("The other player left.");
 }
@@ -299,9 +315,12 @@ function guestSetup() {                         // (from main.js, as the store's
   shift.h = 14; setFrontLock(false); armGates(false);
   shift.greet = `You're ${GUEST.who}'s guest. Tapes are free: take one to a TV and press E`;
 }
-function tgGuestLeaves() {
-  try { sessionStorage.removeItem("jellybuster-guest"); } catch {}
+function tgGuestLeaves(note, bad = false) {     // note: what to say on Play Together once the menu's back (why it ended)
+  try { sessionStorage.removeItem("jellybuster-guest"); if (note) sessionStorage.setItem("jellybuster-tg-note", JSON.stringify({ note, bad })); } catch {}
   location.reload();
+}
+function tgNoteShown() {                        // (from the title menu) -> what to say, if a guest's just been sent home, once
+  try { const n = JSON.parse(sessionStorage.getItem("jellybuster-tg-note")); sessionStorage.removeItem("jellybuster-tg-note"); return n; } catch { return null; }
 }
 if (GUEST?.offer) {                             // just reloaded to join. (Once: a reload after this is a guest with nobody to connect to, free to leave)
   const { offer, who } = GUEST;

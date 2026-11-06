@@ -149,6 +149,7 @@ function titleMenu() {
   $("mmSettingsBack").onclick = () => show("main");
   $("mmTogetherBtn").onclick = () => { show("together"); togetherOpen(); };
   $("tgBack").onclick = () => show("main");
+  { const n = !GUEST && tgNoteShown(); if (n) { show("together"); togetherOpen(); tgStatus(n.note, n.bad); } }   // (a guest just sent home: why, where they'd try again)
   { const j = Jelly.info(); $("setJelly").textContent = `Stocked from ${j.server} as ${j.user}: ${j.tapes} tapes${j.left ? `, ${j.left} more than the store can shelve` : ""}`; }
   $("setUnlink").onclick = () => { saveOff = true; Jelly.unlink().finally(() => location.reload()); };   // (the store's saves stay, for when it's linked again)
 }
