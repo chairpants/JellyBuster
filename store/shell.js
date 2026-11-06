@@ -46,7 +46,7 @@ const doorGold = new THREE.MeshPhongMaterial({ color: 0xc9a227, specular: 0xffe2
 const doorGlass = new THREE.MeshLambertMaterial({ color: 0x8a9aae, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
 const PORT = { y: 1.6, r: 0.17 };
 const theaterDoorMat = new THREE.MeshLambertMaterial({ color: 0x5a1020 });   // maroon
-function makeDoor({ at, c, alongX, hinge, swing, locked = false, leafMat, signs = [], push = false, porthole = false, w = DOOR_W, h = DOOR_H, y0 = 0, stall = false }) {   // stall: a toilet stall's, off the floor, no frame, in a thin partition
+function makeDoor({ at, c, alongX, hinge, swing, locked = false, leafMat, signs = [], push = false, porthole = false, w = DOOR_W, h = DOOR_H, y0 = 0, stall = false, closer = false }) {   // closer: one on a closer, it swings itself shut once nobody's in its way (doorCloserTick)   // stall: a toilet stall's, off the floor, no frame, in a thin partition
   const W = w, base = alongX ? 0 : -Math.PI / 2;   // leaf is built along local x; local +z is world +z (alongX) or world -x
   const toLocal = side => alongX ? side : -side;
   const pivot = new THREE.Group();
@@ -99,7 +99,7 @@ function makeDoor({ at, c, alongX, hinge, swing, locked = false, leafMat, signs 
   // local z the leaf's free edge heads toward = toLocal(swing); rotating by a
   // moves it to local z = hinge * sin(a) * W/2, so the sign of a follows
   const d = { pivot, base, a: 0, openA: Math.PI / 2 * hinge * toLocal(swing), open: false, locked, rattle: 0, shut, openBox,
-    push, at, c, alongX, hinge, v: 0, side: 0 };
+    push, at, c, alongX, hinge, stall, closer, W, swing, v: 0, side: 0 };
   if (!push) { colliders.push(shut); leaf.userData.door = d; aimables.push(leaf); }   // a push door never blocks: it gets out of your way
   else aimBlockers.push(leaf);                  // ...but you can't reach through it (it goes wherever the leaf swings)
   doors.push(d);
@@ -245,12 +245,12 @@ casing(Z, BOH_DOORS.store, true, BOH_OPENING_W);
 const painted = new THREE.MeshLambertMaterial({ color: 0xd9d4c7 });
 makeDoor({ at: HZ, c: BOH_DOORS.breakroom, alongX: true, hinge: 1, swing: 1, leafMat: painted,   // (made in this order: a save keeps the doors by it)
   signs: [{ text: "BREAK ROOM", side: -1 }] });
-makeDoor({ at: HZ, c: BOH_DOORS.restroom, alongX: true, hinge: 1, swing: 1, leafMat: painted,
+makeDoor({ at: HZ, c: BOH_DOORS.restroom, alongX: true, hinge: 1, swing: 1, leafMat: painted, closer: true,
   signs: [{ text: "MEN", side: -1 }] });
 makeDoor({ at: BX0, c: BOH_DOORS.future, alongX: false, hinge: 1, swing: -1, leafMat: theaterDoorMat, push: true, porthole: true,
   signs: [{ text: "THEATER", side: 1 }] });
 makeDoor({ at: CLOSET.x0, c: BOH_DOORS.closet, alongX: false, hinge: -1, swing: -1, w: CLOSET.doorW, leafMat: painted,   // narrow; hinged on the store's side, swings out into the hall
   signs: [{ text: "JANITOR", side: -1 }] });
-makeDoor({ at: HZ, c: BOH_DOORS.restroomF, alongX: true, hinge: 1, swing: 1, leafMat: painted,
+makeDoor({ at: HZ, c: BOH_DOORS.restroomF, alongX: true, hinge: 1, swing: 1, leafMat: painted, closer: true,
   signs: [{ text: "WOMEN", side: -1 }] });
 

@@ -698,7 +698,8 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
   };
 
   // ---- a stall: grey steel, a gap under it, a door that swings in. x0..x1 its width; a side partition where there's no wall ----
-  const STALL_Z = z1 - 1.5, STALL_H = 1.85, STALL_DOOR = 0.72, stallM = new THREE.MeshPhongMaterial({ color: 0x8e979e, specular: 0x555555, shininess: 40 });
+  const STALL_Z = z1 - 2.15,   // (deep enough to step back in out of the door's way, clear of the toilet: see doorStepBack)
+    STALL_H = 1.85, STALL_DOOR = 0.72, stallM = new THREE.MeshPhongMaterial({ color: 0x8e979e, specular: 0x555555, shininess: 40 });
   const buildStall = (x0, x1, partition) => {
     const c = (x0 + x1) / 2, a = c - STALL_DOOR / 2, b = c + STALL_DOOR / 2;
     solid(a - x0, STALL_H, 0.05, stallM, (x0 + a) / 2, STALL_H / 2, STALL_Z); solid(x1 - b, STALL_H, 0.05, stallM, (b + x1) / 2, STALL_H / 2, STALL_Z);   // the pilasters, floor to top

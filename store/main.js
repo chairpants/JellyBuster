@@ -170,7 +170,8 @@ function roomOf(o) {
   return rs.size === 1 ? [...rs][0] : null;
 }
 function roomSort() {                          // file new top-level objects into their rooms (posters load late, so this runs a few times)
-  const movers = new Set([...officeFx.blinds.map(b => b.g), officeFx.shutter, me.group, together.g, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
+  const movers = new Set([   // (a door's left out: it swings between two rooms, and filed in the one it stood open into at load, it vanished from its doorway once shut with that room culled)
+    ...officeFx.blinds.map(b => b.g), officeFx.shutter, ...doors.filter(d => !d.stall).map(d => d.pivot), me.group, together.g, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
   for (const o of [...scene.children]) {
     if (roomSeen.has(o) || roomGroupSet.has(o)) continue;
     roomSeen.add(o);
@@ -369,8 +370,11 @@ renderer.setAnimationLoop(() => {
   }
   for (const d of doors) {                   // doors ease open/closed; a locked one rattles briefly when tried
     if (d.push) { pushDoorTick(d, dt); continue; }
-    d.a += ((d.open ? d.openA : 0) - d.a) * Math.min(1, dt * 5);
-    if (d.closing && Math.abs(d.a) < 0.04) { d.closing = false; doorSnd(d, "wood", "close"); }
+    if (d.closer) doorCloserTick(d, dt);
+    if (doorStep?.d === d && doorStep.t <= DOOR_DANCE.swing[1]) d.a = doorDanceA(doorStep, d.open ? d.openA : 0);   // (in step with you backing out of its way: see doorStepTick)
+    else d.a += ((d.open ? d.openA : 0) - d.a) * Math.min(1, dt * (d.selfShut ? 2.2 : 5));   // (the closer's swing is slower than a hand's)
+    if (d.closing && Math.abs(d.a) < 0.04) { d.closing = false; d.selfShut = false; doorSnd(d, "wood", "close"); }
+    if (d.open) d.selfShut = false;
     d.rattle = Math.max(0, d.rattle - dt);
     d.pivot.rotation.y = d.base + d.a + (d.rattle ? 0.012 * Math.sin(d.rattle * 70) : 0);
   }

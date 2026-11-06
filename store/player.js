@@ -689,6 +689,7 @@ function move(dt) {
     return;
   }
   if (mantle) return mantleTick(dt);
+  if (doorStep) return doorStepTick(dt);
   const airborne = jumpTick(dt);
   if (fall) return;
   if (seated || inspecting || scrub || drunk.out || golf.on) return;   // stand up with E first; (scrubbing: you stay put till it's done)
@@ -784,11 +785,54 @@ function pushDoorTick(d, dt) {
 }
 const doorAt = d => [(d.shut.x0 + d.shut.x1) / 2, 1.05, (d.shut.z0 + d.shut.z1) / 2];
 const doorSnd = (d, kind, action) => window.StoreAmbience?.door(kind, action, ...doorAt(d));
+// ---- out of a door's way: the quarter circle its leaf sweeps, on the side it swings to. In the wall's
+// terms, u runs from the hinge along the doorway, v out from the wall on the swing side ----
+function doorUV(d, x, z) {
+  const along = d.alongX ? x : z, perp = d.alongX ? z : x, hp = d.c + d.hinge * d.W / 2;
+  return { u: (along - hp) * -d.hinge, v: (perp - d.at) * d.swing };
+}
+function inDoorSweep(d, x, z, pad) {           // (a square round it, not the arc: anywhere in front of the leaf counts, however you stand)
+  const { u, v } = doorUV(d, x, z);
+  return u > -pad && u < d.W + pad && v > -0.1 && v < d.W + pad;
+}
+// ---- the door dance: you step back as the door starts to swing, it swings past you, and once it's
+// settled you step back in to where you were. One timeline drives both (DOOR_DANCE, in seconds) ----
+const DOOR_DANCE = { swing: [0, 0.63], back: [0.16, 0.45], home: [0.47, 0.9] };   // (you start back with the door ~15% open, and start in again at ~85%)
+const danceEase = (t, [a, b]) => { const k = Math.max(0, Math.min(1, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
+let doorStep = null;                          // { d, x0, z0, x1, z1, a0, t }: mid-dance (see move, and the door loop in main.js)
+function doorStepBack(d) {                    // straight back from the wall, the way the door opens, to just past its reach; where you stand along the wall stays put
+  if (doorStep || jump.air || fall || mantle || seated || onStool || ladder.on) return false;
+  const perp = d.at + d.swing * (d.W + player.r + (d.stall ? 0.05 : 0.15));   // (a stall's tight: just clear of its door, short of the toilet)
+  doorStep = { d, x0: player.x, z0: player.z, x1: d.alongX ? player.x : perp, z1: d.alongX ? perp : player.z, a0: d.a, t: 0 };
+  return true;
+}
+const doorDanceA = (s, want) => s.a0 + (want - s.a0) * danceEase(s.t, DOOR_DANCE.swing);   // the door's angle, mid-dance
+function doorStepTick(dt) {                   // you, through the usual collisions: back out, a beat, back in
+  const s = doorStep; s.t += dt;
+  if (s.t > DOOR_DANCE.swing[1] && ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].some(k => keys.has(k))) { doorStep = null; return; }   // (the door's done: walking off cuts the bow short)
+  const k = danceEase(s.t, DOOR_DANCE.back) - danceEase(s.t, DOOR_DANCE.home);
+  const tx = s.x0 + (s.x1 - s.x0) * k, tz = s.z0 + (s.z1 - s.z0) * k, x0 = player.x, z0 = player.z;
+  if (!blocked(tx, player.z)) player.x = tx;
+  if (!blocked(player.x, tz)) player.z = tz;
+  if ((playerStepD += Math.hypot(player.x - x0, player.z - z0)) > 0.45) { playerStepD = 0; ambStep(player.x, player.z, 0.5); }
+  if (s.t >= DOOR_DANCE.home[1]) doorStep = null;
+}
+// a door on a closer (the restrooms'): open, it swings itself shut once nobody's been in its way for a moment
+function doorCloserTick(d, dt) {
+  if (!d.open || doorStep?.d === d) { d.closeT = 0; return; }
+  const pad = 0.45, cx = (d.shut.x0 + d.shut.x1) / 2, cz = (d.shut.z0 + d.shut.z1) / 2;
+  const inWay = (x, z) => inDoorSweep(d, x, z, pad) || Math.hypot(x - cx, z - cz) < 1.2;
+  const near = inWay(player.x, player.z) || custs.some(k => k.c && inWay(k.c.group.position.x, k.c.group.position.z))
+    || staff.some(e => e.c && inWay(e.c.group.position.x, e.c.group.position.z)) || (together.peer?.c && inWay(together.peer.c.group.position.x, together.peer.c.group.position.z));
+  if (near) d.closeT = 0; else if ((d.closeT = (d.closeT || 0) + dt) > 1.5) { d.closeT = 0; toggleDoor(d); d.selfShut = true; }
+}
 function toggleDoor(d) {
   if (d.push) return;                        // push doors aren't opened, they're walked through
   if (d.locked) { d.rattle = 0.35; doorSnd(d, "wood", "rattle"); return; }   // just jiggles in its frame
   const next = d.open ? d.shut : d.openBox;
-  if (playerIn(next)) return;                // you're standing where it would swing to
+  if (d.open && playerIn(next)) return;      // you're standing in the doorway
+  const backed = inDoorSweep(d, player.x, player.z, player.r) && doorStepBack(d);   // it'd swing through you: you step back out of its way first
+  if (!backed && !d.open && playerIn(next)) return;   // (nowhere to step back to, and right where it opens to: it doesn't)
   colliders.splice(colliders.indexOf(d.open ? d.openBox : d.shut), 1);
   colliders.push(next);
   d.open = !d.open;
