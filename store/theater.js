@@ -72,7 +72,6 @@
   const WALL_BOT = PIT_Y, WALL_H = TH - WALL_BOT, WALL_CY = (TH + WALL_BOT) / 2;
   const thWall = wallSurface(new THREE.MeshLambertMaterial({ color: 0x3a1a20 }), "fabric");
   const curtainMat = new THREE.MeshLambertMaterial({ color: 0x74121d });
-  const stageWood = new THREE.MeshLambertMaterial({ color: 0x3d2314 });
   const tierFloorMat = new THREE.MeshLambertMaterial({ color: 0x38131a });
   const riserMat = new THREE.MeshLambertMaterial({ color: 0x1e0b0f });
   const stepLightMat = new THREE.MeshBasicMaterial({ color: 0xff1a1a });   // red aisle step lights
@@ -220,21 +219,103 @@
     }
   }
 
-  // stage, curtains, silver screen, and front-row VCR feed podium
+  // ---- the screen end, v3: a small-town picture palace done on a budget. A proscenium of painted plywood (burgundy, the
+  // trim gold paint, not leaf) with fluted cream pilasters, a plywood sunburst over the opening and deco speed lines either
+  // side; in the opening, velvet that actually hangs in folds (gathered back to the sides, a valance with a gold fringe) and
+  // black masking round the screen. The stage: a black-painted deck, carpeted front, a brass nosing and a row of footlights
+  // (they fade with the sconces when a film starts) ----
   const ST_Z0 = 46.8, ST_Y = -0.95;
-  box(TW - 0.2, ST_Y - PIT_Y, TZ1 - ST_Z0, stageWood, TX, (ST_Y + PIT_Y) / 2, (ST_Z0 + TZ1) / 2);
-  box(TW - 0.16, 0.05, TZ1 - ST_Z0 + 0.06, brass, TX, ST_Y + 0.025, (ST_Z0 + TZ1) / 2);
+  const deckBlack = new THREE.MeshLambertMaterial({ color: 0x171415 });
+  const fascia = new THREE.MeshLambertMaterial({ color: 0x3a1018 });       // the stage front, carpeted
+  box(TW - 0.2, ST_Y - PIT_Y, TZ1 - ST_Z0, [fascia, fascia, deckBlack, fascia, fascia, fascia], TX, (ST_Y + PIT_Y) / 2, (ST_Z0 + TZ1) / 2);
+  const goldPaint = new THREE.MeshPhongMaterial({ color: 0xa8843a, specular: 0x4a3c22, shininess: 24 });
+  box(TW - 0.2, 0.05, 0.07, goldPaint, TX, ST_Y - 0.022, ST_Z0 - 0.025);   // the nosing, its top a hair over the deck
+  box(TW - 0.2, 0.07, 0.04, deckBlack, TX, ST_Y - 0.1, ST_Z0 - 0.02);     // the footlights' trough, and the lamps in it
+  {
+    const bulbs = [], n = 16;
+    for (let i = 0; i < n; i++) { const g = new THREE.SphereGeometry(0.022, 10, 8); g.translate(IN0 + 0.3 + (IN1 - IN0 - 0.6) * i / (n - 1), ST_Y - 0.1, ST_Z0 - 0.045); bulbs.push(g); }
+    scene.add(glow(new THREE.Mesh(mergeGeometries(bulbs), sconceMat)));
+  }
   colliders.push({ x0: TX0, x1: TX1, z0: ST_Z0 - 0.05, z1: TZ1, y0: PIT_Y, y1: ST_Y });
 
-  // the 6.84m x 4.56m screen (3:2, the video canvas's shape), its frame; the curtains either side out to the walls, the
-  // valance over it, from just over the frame
-  const SW = 6.84, SH = 4.56, SY = 1.43, FW = 7.13, FH = 4.85, FY0 = -0.97, VY = FY0 + FH - 0.04, VH = 0.67;
-  const CW = (TW - WALL_T - SW) / 2 - 0.28;             // (inner edges just clear of the screen)
-  for (const s of [-1, 1]) box(CW, VY + VH - ST_Y, 0.22, curtainMat, TX + s * (TW / 2 - WALL_T / 2 - CW / 2), (VY + VH + ST_Y) / 2, 47.75);
-  box(TW - WALL_T, VH, 0.26, curtainMat, TX, VY + VH / 2, 47.7);
-  box(FW, FH, 0.08, mat.dark, TX, FY0 + FH / 2, 47.92);
+  // the 6.84m x 4.56m screen (3:2, the video canvas's shape) on black masking, at z 47.85
+  const SW = 6.84, SH = 4.56, SY = 1.43, FW = 7.13, FH = 4.85, FY0 = -0.97;
+  box(FW, FH, 0.08, new THREE.MeshLambertMaterial({ color: 0x060606 }), TX, FY0 + FH / 2, 47.92);
   TVU.uThScreenP.value.set(TX, SY, 47.8); TVU.uThScreenS.value.set(SW, SH);
-  colliders.push({ x0: TX0, x1: TX1, z0: 47.62, z1: TZ1, y0: ST_Y, y1: TH });   // the screen, its frame and the curtains: up on the stage you stop at their faces (the back wall's own stops you past them)
+
+  // the proscenium: its face at PZ, the opening OW wide up to OT; the wall either side of the opening and over it
+  const PZ = 47.58, OW = SW + 1.9, OT = 4.35, OX0 = TX - OW / 2, OX1 = TX + OW / 2;
+  const procMat = wallSurface(new THREE.MeshLambertMaterial({ color: 0x4c1722 }), "paint");
+  const cream = new THREE.MeshLambertMaterial({ color: 0xcdb98f });
+  const fluteTex = makeTexture((ctx, W, H) => {          // the pilasters' fluting: grooves picked out in gold paint
+    ctx.fillStyle = "#d8c59c"; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 5; i++) {
+      const x = W * (0.14 + 0.18 * i);
+      ctx.fillStyle = "#8c7650"; ctx.fillRect(x - 6, 0, 12, H);
+      ctx.fillStyle = "#b8944a"; ctx.fillRect(x - 2, 0, 4, H);
+    }
+  }, 128, 256);
+  const fluted = new THREE.MeshLambertMaterial({ map: fluteTex });
+  const PD = 0.06;                                        // (the face's thickness)
+  for (const [x0, x1] of [[IN0, OX0], [OX1, IN1]]) box(x1 - x0, TH - ST_Y, PD, procMat, (x0 + x1) / 2, (TH + ST_Y) / 2, PZ);
+  box(IN1 - IN0, TH - OT, PD, procMat, TX, (TH + OT) / 2, PZ);
+  for (const [x0, x1] of [[IN0, OX0], [OX1, IN1]]) {     // a pilaster on each: plinth, fluted shaft, a stepped gold capital
+    const cx = (x0 + x1) / 2, w = x1 - x0 - 0.06;
+    box(w + 0.04, 0.28, 0.16, new THREE.MeshLambertMaterial({ color: 0x2a1610 }), cx, ST_Y + 0.14, PZ - 0.06);
+    box(w, OT - 0.3 - (ST_Y + 0.28), 0.1, [cream, cream, cream, cream, fluted, fluted], cx, (OT - 0.3 + ST_Y + 0.28) / 2, PZ - 0.05);
+    box(w + 0.04, 0.16, 0.13, goldPaint, cx, OT - 0.22, PZ - 0.06);
+    box(w + 0.1, 0.12, 0.16, cream, cx, OT - 0.08, PZ - 0.07);
+    box(w + 0.14, 0.04, 0.18, goldPaint, cx, OT + 0.0, PZ - 0.08);
+  }
+  for (const x of [OX0 + 0.035, OX1 - 0.035]) box(0.07, OT - ST_Y, 0.05, goldPaint, x, (OT + ST_Y) / 2, PZ - 0.04);   // the opening's gold edge
+  box(OW, 0.07, 0.05, goldPaint, TX, OT + 0.035, PZ - 0.04);
+  {                                                       // the sunburst: a plywood fan over the opening, its rays in two golds
+    const sun = makeTexture((ctx, W, H) => {
+      const cx = W / 2, cy = H, R = W / 2, n = 15;
+      for (let i = 0; i < n; i++) {
+        const a0 = Math.PI + Math.PI * i / n, a1 = Math.PI + Math.PI * (i + 1) / n;
+        ctx.fillStyle = i % 2 ? "#a07c34" : "#c9a552";
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = "#5a1a22"; ctx.lineWidth = 6;
+      for (const r of [R * 0.36, R - 3]) { ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0); ctx.stroke(); }
+      ctx.fillStyle = "#e0c27a"; ctx.beginPath(); ctx.arc(cx, cy, R * 0.34, Math.PI, 0); ctx.fill();
+    }, 256, 128);
+    const fan = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.85), new THREE.MeshLambertMaterial({ map: sun, transparent: true, alphaTest: 0.5 }));
+    fan.position.set(TX, OT + 0.07 + 0.425, PZ - 0.035); fan.rotation.y = Math.PI; scene.add(fan);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {   // deco speed lines running out from it
+      const len = 2.1 - i * 0.55, y = OT + 0.2 + i * 0.16;
+      box(len, 0.045, 0.03, goldPaint, TX + s * (0.95 + len / 2), y, PZ - 0.045);
+    }
+  }
+  box(IN1 - IN0, 0.06, 0.06, goldPaint, TX, TH - 0.36, PZ - 0.05);   // the cornice: a gold line, a cream crown up to the ceiling
+  box(IN1 - IN0, 0.3, 0.14, cream, TX, TH - 0.15, PZ - 0.06);
+
+  // the velvet, in folds: a plane rippled across its width, lit by the room like anything else (each fold catches the screen)
+  const pleated = (w, h, folds, amp) => {
+    const g = new THREE.PlaneGeometry(w, h, folds * 8, 1), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setZ(i, amp * Math.sin((p.getX(i) / w + 0.5) * folds * Math.PI * 2));
+    g.rotateY(Math.PI); g.computeVertexNormals(); return g;
+  };
+  const velvet = new THREE.MeshLambertMaterial({ color: 0x7a1220 });
+  const CW = OW / 2 - SW / 2 + 0.06;                       // gathered back, their inner edges just over the masking
+  for (const s of [-1, 1]) {
+    const c = new THREE.Mesh(pleated(CW, OT - ST_Y, 7, 0.07), velvet);
+    c.position.set(TX + s * (OW / 2 - CW / 2), (OT + ST_Y) / 2, PZ + 0.15); scene.add(c);
+  }
+  const VH = 0.6, val = new THREE.Mesh(pleated(OW, VH, 24, 0.045), velvet);   // the valance, in front of them
+  val.position.set(TX, OT - VH / 2, PZ + 0.07); scene.add(val);
+  {
+    const fr = makeTexture((ctx, W, H) => {               // its fringe: gold threads, gaps between
+      ctx.clearRect(0, 0, W, H);
+      for (let x = 0; x < W; x += 4) { ctx.fillStyle = x % 8 ? "#a8843a" : "#c9a552"; ctx.fillRect(x, 0, 2, H * (0.85 + 0.15 * Math.sin(x))); }
+      ctx.fillStyle = "#b8944a"; ctx.fillRect(0, 0, W, H * 0.22);
+    }, 64, 32);
+    fr.wrapS = THREE.RepeatWrapping; fr.repeat.x = OW / 0.12;
+    const fringe = new THREE.Mesh(new THREE.PlaneGeometry(OW, 0.1), new THREE.MeshLambertMaterial({ map: fr, alphaTest: 0.5, side: THREE.DoubleSide }));
+    fringe.position.set(TX, OT - VH - 0.04, PZ + 0.02); fringe.rotation.y = Math.PI; scene.add(fringe);
+  }
+  colliders.push({ x0: TX0, x1: TX1, z0: PZ - 0.14, z1: TZ1, y0: ST_Y, y1: TH });   // the proscenium and all behind it: up on the stage you stop at its face (the back wall's own would let you past)
 
   theaterScreenMesh = glow(new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), mat.dark));
   theaterScreenMesh.position.set(TX, SY, 47.85);
@@ -242,11 +323,36 @@
   scene.add(theaterScreenMesh);
   aimables.push(theaterScreenMesh);
 
-  // small VCR deck at the center of the stage apron so you can load/eject tapes right in the theater
-  const deck = box(0.46, 0.12, 0.32, mat.dark, TX, ST_Y + 0.08, ST_Z0 + 0.22);
-  deck.userData.theaterDeck = true; aimables.push(deck);
-  const deckLbl = textPlane("THEATER VCR FEED", 0.42, 0.07, "#ffd400", "#14161a");
-  deckLbl.position.set(TX, ST_Y + 0.08, ST_Z0 + 0.058); deckLbl.rotation.y = Math.PI; scene.add(deckLbl);
+  // the theater's VCR: a lift in the stage floor, centre front. Waiting for a tape, it stands a few centimetres up, presenting
+  // its front: the slot, the VCR's display and a green light; a tape in, it sinks flush with the deck (its lid painted the same
+  // black, only its seam shows) for the film. From the seats it's nothing; at the stage looking down, you'll find it (E on it,
+  // as on any VCR)
+  {
+    const DZ = ST_Z0 + 0.3, g = new THREE.Group(); g.position.set(TX, ST_Y + 0.002, DZ); scene.add(g);
+    const seam = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.36), new THREE.MeshLambertMaterial({ color: 0x050505 }));
+    seam.rotation.x = -Math.PI / 2; seam.position.set(TX, ST_Y + 0.001, DZ); scene.add(seam);
+    const silver = new THREE.MeshLambertMaterial({ color: 0x2a2b2e });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.14, 0.33), [silver, silver, deckBlack, silver, silver, silver]);
+    body.position.y = -0.07; g.add(body);
+    const slot = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.014), new THREE.MeshBasicMaterial({ color: 0x050505 }));
+    slot.position.set(0.06, -0.018, -0.1656); slot.rotation.y = Math.PI; g.add(slot);
+    const bezel = new THREE.Mesh(new THREE.PlaneGeometry(0.218, 0.026), new THREE.MeshLambertMaterial({ color: 0x6a6c72 }));   // (its flap's frame, so the slot reads)
+    bezel.position.set(0.06, -0.018, -0.1653); bezel.rotation.y = Math.PI; g.add(bezel);
+    const disp = glow(new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.031), new THREE.MeshBasicMaterial({ color: 0x6dffb0 })));
+    disp.position.set(-0.13, -0.022, -0.1656); disp.rotation.y = Math.PI; g.add(disp);
+    const led = glow(new THREE.Mesh(new THREE.CircleGeometry(0.004, 8), new THREE.MeshBasicMaterial({ color: 0x3dff6a })));
+    led.position.set(0.19, -0.02, -0.1656); led.rotation.y = Math.PI; g.add(led);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.36), hitMat);
+    hit.position.set(TX, ST_Y + 0.04, DZ); hit.userData.theaterDeck = true; scene.add(hit); aimables.push(hit);
+    const UP = 0.045;
+    g.position.y += UP;
+    thDeck = { g, lift: UP, tick(dt) {
+      if (!disp.material.map && vcrDisplay) { disp.material.map = vcrDisplay.tex; disp.material.color.set(0xffffff); disp.material.needsUpdate = true; }   // (the VCR's own clock face: 12:00 blinking while it waits)
+      const want = playing ? 0 : UP;                // up, ready for a tape; down out of the way once one's in
+      this.lift += Math.sign(want - this.lift) * Math.min(Math.abs(want - this.lift), dt * 0.03);   // a slow motor: 1.5 s
+      g.position.y = ST_Y + 0.002 + this.lift;
+    } };
+  }
 
   // the projection booth's ports up in the back wall (z = TZ0), at the projector's height + volumetric projector beam
   const PORT_Y = 4.2;

@@ -344,6 +344,7 @@ renderer.setAnimationLoop(() => {
       u.value += Math.sign(want - u.value) * Math.min(Math.abs(want - u.value), dt / (want ? 2 : 6));   // 2 s up, 6 s down
       if (thSconceMat) thSconceMat.emissiveIntensity = 0.85 * u.value;
     }
+    thDeck?.tick(dt);
     if (projBeamMat) {
       beamU.uBeamOn.value = tvLight.base ? 1 : 0;              // playing: the shader tints by picture section
       projBeamMat.color.setHex(tvLight.base ? 0xffffff : 0xd8e8ff);

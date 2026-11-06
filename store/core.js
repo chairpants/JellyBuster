@@ -903,6 +903,7 @@ const mat = {
 let floorHeightAt = () => 0;                // floor height under (x, z): 0 everywhere but the theater's stepped rows (set with the theater)
 let panelMats = [];                        // ceiling panel groups, per switch zone — dark when switched off, flicker independently on warm-up
 let theaterScreenMesh = null;
+let thDeck = null;                          // the theater's pop-up VCR in the stage floor (store/theater.js): thDeck.tick(dt) raises it while a tape's in
 let projBeamMat = null;
 let thSconceMat = null;                    // the auditorium wall sconces' shades (see the main loop)
 const beamU = { uBeamZ: { value: TVU.uTvZoneC.value }, uBeamOn: { value: 0 } };   // the beam reads the TV light's 3x3 picture colors straight from the shared array
