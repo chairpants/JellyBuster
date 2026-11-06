@@ -26,15 +26,16 @@ const WALL_SHIFT = WALL_L + STORE.x;       // how far the movie-side wall (and e
 // back of house: a block built on behind the store's back wall at the TV Shows
 // end — a hallway along the back wall, a restroom and a break room off it, the
 // janitor's closet at the hall's far end, and a door at its near end into the theater's lobby
-const BOH = { x0: 2, z1: 35, hallZ: 29.8, splitX: 5.8, h: 2.7, rrX: 3.9 };   // west wall, rear wall, hall/rooms wall, restrooms|break room wall, ceiling height, women's|men's wall
+const BOH = { x0: 2, z1: 35, hallZ: 29.8, splitX: 5.8, h: 2.7, rrX: 3.9, officeZ: 32.4 };   // west wall, rear wall, hall/rooms wall, restrooms|break room wall, ceiling height, women's|men's wall, break room|manager's office wall
 const DOOR_W = 1.1, DOOR_H = 2.13;          // opening; tops out just under the store's blue wall stripe
-const BOH_DOORS = { store: 4.6, restroom: 5.0, restroomF: 3.0, breakroom: 8.55, future: 28.9, closet: 28.9 };   // (future, closet: along z, in the hall's west wall and the closet's)
+const BOH_DOORS = { store: 4.6, restroom: 5.0, restroomF: 3.0, breakroom: 8.55, office: 6.845, future: 28.9, closet: 28.9 };   // (future, closet: along z, in the hall's west wall and the closet's)
 const breakFx = { clock: null, punch: null, clock12: null, coffee: null, coffeeLed: null, tv: null, tvMesh: null, vcr: null, tvT: 0 };   // the break room's moving parts (see breakroomTick)
 const closetBulb = { mat: null };                 // the closet's bare bulb (its glass goes warm white when the "closet" zone is on)
 const fireExit = { leaf: null, shut: null, a: 0, open: false, t: 0 };   // the theater's emergency exit door: its leaf, its collider while it's shut, how far it's swung (see fireExitTick)
 const storeExit = { leaf: null, shut: null, a: 0, open: false, t: 0 };   // and the store's, past the end of the east wall's shelves
 const STORE_EXIT = { z0: 26.3, z1: 27.4 };       // where along that wall
 const boothGlow = { lamps: null, stairs: null, red: null };   // the booth's wall lamps' lenses, the stairwell's bulbs, the booth's red working lights (on while its lights are off)
+const OFFICE_WIN = { x0: 7.5, x1: 8.65, sill: 0.95, head: 2.05 }, OFFICE_DOOR_W = 0.85;   // the manager's window onto the break room, and the narrow door beside it
 const CLOSET = { x0: 9.4, x1: STORE.x, doorW: 0.8 };   // the hall's end, x0 its wall across the hall (the door's in it) to the building's side wall
 const SCUPPERS = [[-7.84, 12, 1, 0], [-7.84, 26, 1, 0], [11.1, 6, -1, 0], [11.1, 21, -1, 0], [-3.0, 48.6, 0, -1], [7.5, 35.1, 0, -1]];   // the overflow scuppers through the parapet: where on the outer face, and its inward normal
 // the lot out front, front to back (z): the walk, the drive (a lane each way: right-hand, so east is the near lane),
@@ -200,6 +201,7 @@ document.body.appendChild(renderer.domElement);
 // bakeTvVis): per voxel, how much of the screen's left/center/right third it
 // can see. Patched into every Lambert/Phong material; the uniform objects
 // are shared by reference, so one write per frame feeds every material.
+const TH_COLS = 6, TH_ROWS = 4;   // the theater screen's light: the picture sampled as 6 x 4 patches (see the auditorium in ROOM_FRAG)
 const TVU = {
   uTvGain: { value: 0 }, uTvAmb: { value: new THREE.Color(0) }, uTvCell: { value: 0 },
   uTvZoneP: { value: new Float32Array(27) }, uTvZoneC: { value: new Float32Array(27) },
@@ -208,6 +210,7 @@ const TVU = {
   // room lighting (see ROOM_FRAG): switchable zones, daylight through the glass, and the outdoors
   uZone: { value: new THREE.Vector4(1, 1, 1, 1) },   // front, aisles, lounge switches (0..1, flicker-aware), daylight 0..1
   uBoh: { value: new THREE.Vector4(1, 1, 1, 0) },    // hall, break room, restroom switches, the closet bulb
+  uOffice: { value: 1 },                             // the manager's office switch
   uFloorBox: { value: new THREE.Vector4() },         // sales floor: x0, x1, z1 (back wall), ceiling
   uBohBox: { value: new THREE.Vector4() },           // back of house: x0, x1, hall|rooms z, z1
   uBohSplit: { value: new THREE.Vector3() },         // restroom | break room x, ceiling, the closet's wall across the hall
@@ -224,10 +227,13 @@ const TVU = {
   uThBox: { value: new THREE.Vector4() },            // auditorium: x0, x1, z0, z1
   uThScreenP: { value: new THREE.Vector3(-2.87, 1.05, 47.8) }, // theater screen center for live bounce
   uThSconce: { value: 1 },                           // auditorium wall sconces 0..1: up between films, fading out once one plays
+  uThGain: { value: 0 },                             // the theater screen's light 0..1 (a tape in), its own: not washed out by the store's lights
+  uThZoneC: { value: new Float32Array(TH_COLS * TH_ROWS * 3) },   // the picture as TH_COLS x TH_ROWS patches (linear, row by row from the top left), each its own light
+  uThScreenS: { value: new THREE.Vector2(6.84, 4.56) },           // the screen's width, height
   uDeadL: { value: Array.from({ length: 3 }, () => new THREE.Vector4()) },   // the sales floor's burnt-out troffers: x, z, how dark (see TROFFER_GRID)
   // light spilling through doorways into a darker room next door (see spillTick), live ones first (uSpillN): per spill,
   // the light it comes from (xyz, inside the lit room) + reach past the door (w), its color x strength, the box it
-  // lands in (x0, x1, z0, z1), and the door opening (plane: 0 z = const, 1 x = const; that const; center along it; half width)
+  // lands in (x0, x1, z0, z1), and the door opening (plane: 0 z = const, 1 x = const; that const; center along it; half width); the color's w: a window's sill height
   uSpillN: { value: 0 },
   uSpillD: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
   uSpillP: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
@@ -261,7 +267,8 @@ const ROOM_FRAG = `
   vec3 flS = mix(uInGround, uInSky, 0.3 * rN.y + 0.7) + uInAmb * 1.2 + uInDirC * (0.45 + 0.35 * dot(rN, uInDir));   // the same, as fluorescents and white walls give it: from everywhere, little of it from one way (all but the auditorium)
   float day = uZone.w;
   vec3 rl;
-  if (P.x > uFloorBox.x && P.x < uFloorBox.y && P.z > -0.05 && P.z < uFloorBox.z && P.y < uFloorBox.w) {
+  // (the emergency exits' doors hang at the walls' outside faces, past the rooms' boxes: their insides, and the openings, are the room's. Out to the leaf's own outside plate)
+  if (P.x > uFloorBox.x && (P.x < uFloorBox.y || (P.x < ${(STORE.x + 0.105).toFixed(3)} && P.z > ${STORE_EXIT.z0.toFixed(2)} && P.z < ${STORE_EXIT.z1.toFixed(2)})) && P.z > -0.05 && P.z < uFloorBox.z && P.y < uFloorBox.w) {
     float w1 = 1.0 - smoothstep(9.0, 11.0, P.z), w3 = smoothstep(18.0, 20.0, P.z), w2 = max(0.0, 1.0 - w1 - w3);
     float win = exp(-P.z / 9.0);
     float facing = 0.75 + 0.35 * max(-rN.z, 0.0) + 0.2 * max(rN.y, 0.0);
@@ -283,8 +290,9 @@ const ROOM_FRAG = `
        + (day * uDayC + (1.0 - day) * uNightC) * (0.42 + 0.9 * win) * facing;
   } else if (P.x > uBohBox.x && P.x < uBohBox.y && P.z >= uFloorBox.z && P.z < uBohBox.w && P.y < uBohSplit.y + 0.05) {
     bool closet = P.x > uBohSplit.z && P.z < uBohBox.z;   // the janitor's closet: one bare bulb (uBoh.w), warm
-    float lvl = closet ? 0.8 * uBoh.w : P.z < uBohBox.z ? uBoh.x : (P.x < uBohSplit.x ? uBoh.z : uBoh.y);
-    rl = (0.03 + 0.97 * lvl) * flS * (closet ? vec3(1.12, 0.95, 0.74) : vec3(1.0));
+    bool office = P.x > uBohSplit.x && P.z > ${BOH.officeZ.toFixed(2)};   // the manager's office: a yellowed old fixture
+    float lvl = closet ? 0.8 * uBoh.w : office ? 0.86 * uOffice : P.z < uBohBox.z ? uBoh.x : (P.x < uBohSplit.x ? uBoh.z : uBoh.y);
+    rl = (0.03 + 0.97 * lvl) * flS * (closet ? vec3(1.12, 0.95, 0.74) : office ? vec3(1.1, 0.97, 0.78) : vec3(1.0));
   } else if (P.x > uShaft.x && P.x < uLobbyBox.y && P.z > uShaft.y && P.z < uLobbyBox.w && P.y < uTall.y + 0.05) {   // the booth's stairs: bulbs on cords, warm. Cones down from their shades; above them, only what bounces back up
     float over = P.x > ${(SHAFT.split + 0.05).toFixed(2)} && P.z < ${SHAFT.turn.toFixed(2)} ? ${STAIR_BULBS[0][1].toFixed(2)} : ${STAIR_BULBS[1][1].toFixed(2)};
     float bounce = mix(0.17, 0.07, smoothstep(over - 0.2, over + 0.5, P.y)) + 0.14 * max(-rN.y, 0.0);   // (a ceiling gets the most of what comes back up)
@@ -294,12 +302,19 @@ const ROOM_FRAG = `
     rl = (0.03 + 0.97 * uThLight.z) * flS * vec3(1.12, 0.95, 0.74) + (1.0 - uThLight.z) * flS * vec3(0.16, 0.012, 0.0);
   } else if (P.x > uLobbyBox.x && P.x < uLobbyBox.y && P.z >= uLobbyBox.z && P.z < uLobbyBox.w && P.y < uBohSplit.y + 0.05) {
     rl = (0.04 + 0.96 * uThLight.x) * flS * vec3(1.08, 0.93, 0.80);
-  } else if (P.x > uThBox.x && P.x < uThBox.y && P.z >= uThBox.z && P.z < uThBox.w && P.y < uTall.y + 0.1) {
-    vec3 thFl = (0.025 + 0.30 * uThLight.y + 0.12 * uThSconce) * fl * vec3(1.15, 0.82, 0.55);   // house lights + a low warm sconce wash
-    vec3 sL = uThScreenP - P; float sd2 = dot(sL, sL); sL *= inversesqrt(sd2);
-    float sCos = max(sL.z, 0.0) * (0.35 + 0.65 * max(dot(rN, sL), 0.0));
-    vec3 scrGlow = uTvGain * (uTvZoneC[4] * 4.2 + uTvAmb * 2.4) * sCos / (1.0 + 0.025 * sd2);
-    rl = thFl + scrGlow;
+  } else if ((P.x > uThBox.x || (P.x > ${(WALL_L - 0.22).toFixed(3)} && P.z > ${FIRE_EXIT.z0.toFixed(2)} && P.z < ${FIRE_EXIT.z1.toFixed(2)})) && P.x < uThBox.y && P.z >= uThBox.z && P.z < uThBox.w && P.y < uTall.y + 0.1) {
+    float film = 1.0 - uThSconce;                  // a film running: the house goes down, even with its switch left on
+    vec3 thFl = (mix(0.025, 0.006, film) + 0.30 * uThLight.y * mix(1.0, 0.12, film) + 0.12 * uThSconce) * fl * vec3(1.15, 0.82, 0.55);   // house lights + a low warm sconce wash
+    vec3 scr = vec3(0.0), avg = vec3(0.0);         // the screen as ${TH_COLS * TH_ROWS} patches of the picture, each lighting the room from where it is on the screen
+    for (int k = 0; k < ${TH_COLS * TH_ROWS}; k++) {
+      float c = float(k % ${TH_COLS}), r = float(k / ${TH_COLS});   // (the screen faces -z: the picture's left is +x)
+      vec3 L = uThScreenP + vec3(uThScreenS.x * (0.5 - (c + 0.5) / ${TH_COLS}.0), uThScreenS.y * (0.5 - (r + 0.5) / ${TH_ROWS}.0), 0.0) - P;
+      float d2 = dot(L, L); L *= inversesqrt(d2);
+      scr += uThZoneC[k] * max(L.z, 0.0) * (0.3 + 0.7 * max(dot(rN, L), 0.0)) / (1.0 + 0.03 * d2);   // (0.3: light off the seats and walls, wrapping round)
+      avg += uThZoneC[k];
+    }
+    vec3 sC = P - uThScreenP;                      // and what bounces round the room: the whole picture's colour, everywhere, a little less far back
+    rl = thFl + uThGain * (scr * ${(14 / (TH_COLS * TH_ROWS)).toFixed(4)} + avg * ${(2.2 / (TH_COLS * TH_ROWS)).toFixed(4)} / (1.0 + 0.012 * dot(sC, sC)));
   } else {
     vec3 sun = mix(uSunGround, uSunSky, 0.5 * rN.y + 0.5) + uSunC * max(dot(rN, uSunDir), 0.0);
     vec3 moon = mix(uMoonGround, uMoonSky, 0.5 * rN.y + 0.5) + uMoonC * max(dot(rN, uMoonDir), 0.0);
@@ -316,7 +331,7 @@ const ROOM_FRAG = `
     if (t <= 0.0 || t >= 1.0) continue;
     vec3 Q = sp.xyz + (P - sp.xyz) * t;            // where the light's path crosses the doorway's plane
     float past = length(P - Q), soft = 0.025 + 0.035 * past;
-    float edge = max(abs((xPl ? Q.z : Q.x) - dd.z) - dd.w, max(-Q.y, Q.y - ${DOOR_H.toFixed(2)}));
+    float sill = uSpillC[i].w, edge = max(abs((xPl ? Q.z : Q.x) - dd.z) - dd.w, max(sill - Q.y, Q.y - (sill > 0.0 ? ${OFFICE_WIN.head.toFixed(2)} : ${DOOR_H.toFixed(2)})));   // (w: a window's sill, 0 for a doorway)
     float k = clamp(1.0 - past / sp.w, 0.0, 1.0);
     spill += uSpillC[i].rgb * (1.0 - smoothstep(-soft, soft, edge)) * k * k * (0.35 + 0.65 * max(dot(rN, normalize(sp.xyz - P)), 0.0));
   }
@@ -352,7 +367,7 @@ for (const M of [THREE.MeshLambertMaterial, THREE.MeshPhongMaterial]) M.prototyp
     .replace("#include <common>", `#include <common>
       uniform float uTvGain, uTvCell; uniform vec3 uTvAmb, uTvVolMin, uTvVolSize; uniform vec4 uTvRoom;
       uniform vec3 uTvZoneP[9], uTvZoneC[9]; uniform highp sampler3D uTvVis; varying vec3 vTvPos;
-      uniform vec4 uZone, uBoh, uFloorBox, uBohBox, uLobbyBox, uThBox; uniform vec3 uBohSplit; uniform vec4 uThLight, uTall; uniform vec2 uShaft; uniform vec4 uDeadL[3]; uniform vec3 uThScreenP; uniform float uThSconce;
+      uniform vec4 uZone, uBoh, uFloorBox, uBohBox, uLobbyBox, uThBox; uniform vec3 uBohSplit; uniform vec4 uThLight, uTall; uniform vec2 uShaft; uniform vec4 uDeadL[3]; uniform vec3 uThScreenP; uniform float uThSconce, uOffice, uThGain; uniform vec3 uThZoneC[${TH_COLS * TH_ROWS}]; uniform vec2 uThScreenS;
       uniform vec4 uSpillP[8], uSpillC[8], uSpillB[8], uSpillD[8]; uniform int uSpillN;
       uniform vec3 uInSky, uInGround, uInAmb, uInDirC, uInDir, uSunSky, uSunGround, uSunC, uSunDir, uMoonSky, uMoonGround, uMoonC, uMoonDir, uDayC, uNightC, uFogC; uniform float uFogD, uFogCam;`)
     .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nfloat tvOut = 0.0;\n" + ROOM_FRAG + TV_FRAG)
@@ -411,6 +426,14 @@ const WALL_KINDS = {
         lvl = uBoh.x;
         if (P.x > ${f2(CLOSET.x0)}) { tint = vec3(0.8, 0.79, 0.74); grain = 0.05; peel = 0.03; gloss = 0.0; mud = 1.0; lvl = uBoh.w; }
         else tint = vec3(0.98, 0.95, 0.88);       // the hall: an old off-white, satin all the same
+      }
+      else if (P.x > ${f2(BOH.splitX)} && P.z > ${f2(BOH.officeZ)}) {   // the manager's office: 4x8 sheets of walnut-look paneling, the grooves at random spacing like the real stuff, years of cigarettes darkening it toward the ceiling
+        float sheet = floor(u / 1.22), su = fract(u / 1.22) * 12.0, id = floor(su), fu = fract(su), r = fract(sin((id + sheet * 13.0) * 91.7) * 43758.5);
+        float g = texture2D(uWallTex, vec2(u / 0.9 + id * 0.37, P.y / 7.0 + sheet * 0.61)).b, g2 = texture2D(uWallTex, vec2(u / 0.21 + id * 0.13, P.y / 4.0)).b;
+        tint = vec3(0.3, 0.165, 0.08) * (0.72 + 0.26 * r) * (0.62 + 0.55 * g + 0.3 * g2);
+        tint *= mix(1.0, 0.72, smoothstep(1.5, 2.7, P.y)) * (0.9 + 0.1 * smoothstep(0.0, 0.5, P.y));
+        if (r > 0.5 || id < 0.5) tint *= 0.38 + 0.62 * smoothstep(0.0, 0.07, min(fu, 1.0 - fu));   // the V-grooves (every sheet's edge, and a few between)
+        grain = 0.02; peel = 0.0; gloss = 0.012; tight = 22.0; lvl = uOffice;
       }
       else if (P.x > ${f2(BOH.splitX)}) { tint = P.y < 1.2 ? vec3(0.68, 0.74, 0.63) : vec3(0.97, 0.93, 0.82); if (abs(P.y - 1.2) < 0.012) tint *= 0.55; grain = 0.012; peel = 0.05; gloss = 0.3; tight = 46.0; lvl = uBoh.y; }   // the break room: sage to the rail, cream over it, in gloss
       else { tint = vec3(0.86, 0.9, 0.93); grain = 0.012; peel = 0.05; gloss = 0.34; tight = 46.0; lvl = uBoh.z; }   // the restrooms: a pale blue-grey, in gloss
@@ -912,18 +935,19 @@ function thSeatTick(dt) {
 }
 
 // the light switch zones: three along the sales floor, then the back of house rooms
-const LIGHT_ZONES = ["front", "aisles", "lounge", "hall", "breakroom", "restroom", "lobby", "theater", "closet", "booth", "stairwell"];
-const ZONE_NAMES = { front: "front", aisles: "aisle", lounge: "lounge", hall: "back hall", breakroom: "break room", restroom: "restroom", lobby: "theater lobby", theater: "auditorium", closet: "closet", booth: "projection booth", stairwell: "booth stairs" };
-const ZONE_LABELS = { front: "FRONT", aisles: "AISLES", lounge: "LOUNGE", hall: "HALL", breakroom: "LIGHTS", restroom: "LIGHTS", lobby: "LOBBY", theater: "HOUSE", closet: "LIGHT", booth: "BOOTH", stairwell: "STAIRS" };
+const LIGHT_ZONES = ["front", "aisles", "lounge", "hall", "breakroom", "restroom", "lobby", "theater", "closet", "booth", "stairwell", "office"];
+const ZONE_NAMES = { front: "front", aisles: "aisle", lounge: "lounge", hall: "back hall", breakroom: "break room", restroom: "restroom", lobby: "theater lobby", theater: "auditorium", closet: "closet", booth: "projection booth", stairwell: "booth stairs", office: "manager's office" };
+const ZONE_LABELS = { front: "FRONT", aisles: "AISLES", lounge: "LOUNGE", hall: "HALL", breakroom: "LIGHTS", restroom: "LIGHTS", lobby: "LOBBY", theater: "HOUSE", closet: "LIGHT", booth: "BOOTH", stairwell: "STAIRS", office: "LIGHTS" };
 function lightZoneAt(x, z, y = 0) {
   if (z >= BOH.z1) return "theater";
   if (z > SHAFT.z0 && z < BOH.z1 && x > SHAFT.x0 && x < BOH.x0) return "stairwell";
   if (z > STORE.z && x < BOH.x0) return y > 2.8 && z > TALL.z0 ? "booth" : "lobby";
-  if (z > STORE.z) return z < BOH.hallZ ? (x > CLOSET.x0 ? "closet" : "hall") : x < BOH.splitX ? "restroom" : "breakroom";   // (the two restrooms are on one circuit: the shader has the one level for them)
+  if (z > STORE.z) return z < BOH.hallZ ? (x > CLOSET.x0 ? "closet" : "hall") : x < BOH.splitX ? "restroom" : z > BOH.officeZ ? "office" : "breakroom";   // (the two restrooms are on one circuit: the shader has the one level for them)
   return z < 10 ? "front" : z < 19 ? "aisles" : "lounge";
 }
 const allLights = [];                      // every light that lights-out kills (base intensity in userData.on)
 const aimables = [];                       // E targets: TV screen, couch, lamps, returns counter, snack stand
+const fallTops = [];                       // what you can land on but walk past (a chair, say: not a collider): { x0, x1, z0, z1, y1 }. See fallSurface
 const aimBlockers = [];                    // solid things you can't reach through: walls, the back of a snack rack
 const lampPools = [];                      // side-lamp floor pools — drowned out whenever the overhead lights are on
 const lamps = [];                          // the two side lamps — holding L toggles both together

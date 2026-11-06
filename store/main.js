@@ -35,7 +35,7 @@ function saveState() {
     staff: staff.map(e => ({ id: e.id, first: e.first, last: e.last, female: e.female, outfit: e.outfit, skills: e.skills, jobs: e.jobs.map(j => ({ id: j.id, pri: j.pri })), sched: e.sched })),
     you: { skills: you.skills }, rep: rep.v, upg, drunk: { gut: +drunk.gut.toFixed(3), blood: +drunk.blood.toFixed(3), hang: drunk.hang, owe: drunk.owe },
     counterItems: Object.fromEntries(counterItemsList().map(it => { const f = cmove.item === it ? cmove.from : null; return [it.id, f ? [f.x, f.z, f.ry] : [+it.g.position.x.toFixed(3), +it.g.position.z.toFixed(3), +it.g.rotation.y.toFixed(3)]]; })), members: SIM ? posTerm.activeNums() : undefined, signups: growth.pending, prospects: growth.prospects, show: show.title && { title: copyKey(show.title), day: show.day, sold: show.sold, status: show.status, spawned: show.spawned },
-    lights: zoneOn, shift: { day: shift.day, h: shift.h, date0: shift.date0, stats: shift.stats, goals: shift.goals }, gatesArmed: gateAlarm.armed, frontLocked: frontLock.locked, lamps: lamps.map(l => !!l.userData.on), doors: doors.map(d => d.open), flap: flapOpen, cooler: coolerOpen,
+    office: officeSave(), lights: zoneOn, shift: { day: shift.day, h: shift.h, date0: shift.date0, stats: shift.stats, goals: shift.goals }, gatesArmed: gateAlarm.armed, frontLocked: frontLock.locked, lamps: lamps.map(l => !!l.userData.on), doors: doors.map(d => d.open), flap: flapOpen, cooler: coolerOpen,
     desens: catalog.flatMap(t => [t, ...(t.copies || [])]).filter(c => c.desens).map(copyKey),
     rented: rentedCopies.map(copyKey), rentals: Object.fromEntries(rentedCopies.map(c => [copyKey(c), posTerm.rentalOf(c)])),
     lost: catalog.flatMap(t => [t, ...(t.copies || [])]).filter(c => c.lost).map(copyKey), budget: posTerm.budget(), owed: posTerm.owedAll(), records: posTerm.recordsAll(), messages: posTerm.messagesAll(),
@@ -66,6 +66,7 @@ function loadState(S) {
     if (S.frontLocked) setFrontLock(true);
     S.lamps?.forEach((on, i) => lamps[i] && setLamp(lamps[i], on));
     S.doors?.forEach((open, i) => { if (doors[i] && open !== doors[i].open) toggleDoor(doors[i]); });
+    officeLoad(S.office);
     if (S.flap && !flapOpen) toggleFlap();
     coolerOpen = !!S.cooler;
     if (S.cutout) { Object.assign(cutout, S.cutout); cutoutFit(cutout.x, cutout.z, cutout.ry, cutout.box); cutout.g?.position.set(cutout.x, 0, cutout.z); cutout.g?.rotation.set(0, cutout.ry, 0); }
@@ -151,14 +152,14 @@ const clock = new THREE.Clock();
 // street, and the lobby and auditorium only while their push doors swing open.
 // Lights and anything that moves (you, Dana, customers, the stool, the
 // standee) are left alone
-const ROOMS = ["out", "store", "hall", "closet", "restroom", "breakroom", "lobby", "theater", "hatch"];   // (hatch: the roof hatch, its shaft and ladder, seen from the closet and from up top)
+const ROOMS = ["out", "store", "hall", "closet", "restroom", "breakroom", "office", "lobby", "theater", "hatch"];   // (hatch: the roof hatch, its shaft and ladder, seen from the closet and from up top)
 const HATCH_PEEK = 2.5;                        // on the roof, this close to the hatch you can see down past its shaft into the closet; any further and the shaft's all there is
 const hatchParts = new Set(roof.hatchParts);
 const roomGroups = Object.fromEntries(ROOMS.map(r => { const g = new THREE.Group(); scene.add(g); return [r, g]; }));
 function roomAt(x, z) {
   if (z < 0 || x < WALL_L || x > STORE.x || !inBuilding(x, z)) return "out";   // (round the back too)
   if (z < STORE.z) return "store";
-  if (z < BOH.z1) return x < BOH.x0 ? "lobby" : z < BOH.hallZ ? (x > CLOSET.x0 ? "closet" : "hall") : x < BOH.splitX ? "restroom" : "breakroom";
+  if (z < BOH.z1) return x < BOH.x0 ? "lobby" : z < BOH.hallZ ? (x > CLOSET.x0 ? "closet" : "hall") : x < BOH.splitX ? "restroom" : z > BOH.officeZ ? "office" : "breakroom";
   return "theater";
 }
 const roomBox = new THREE.Box3(), roomSeen = new WeakSet(), roomGroupSet = new Set(Object.values(roomGroups));
@@ -169,7 +170,7 @@ function roomOf(o) {
   return rs.size === 1 ? [...rs][0] : null;
 }
 function roomSort() {                          // file new top-level objects into their rooms (posters load late, so this runs a few times)
-  const movers = new Set([me.group, together.g, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
+  const movers = new Set([...officeFx.blinds.map(b => b.g), officeFx.shutter, me.group, together.g, stool.g, cutout.g, BOOTH.g, fireExit.leaf, storeExit.leaf, ...staff.map(e => e.c?.group), ...custs.map(k => k.c?.group)]);
   for (const o of [...scene.children]) {
     if (roomSeen.has(o) || roomGroupSet.has(o)) continue;
     roomSeen.add(o);
@@ -198,7 +199,8 @@ function regionTick() {
     else { const atOpening = camX + (hallDoor.at - camX) * (STORE.z - camZ) / (hallDoor.c - camZ); nearPort = Math.abs(atOpening - BOH_DOORS.store) < BOH_OPENING_W / 2; }
   }
   restDoor ??= doors.find(d => d.alongX && Math.abs(d.c - BOH_DOORS.restroom) < 0.01); restFDoor ??= doors.find(d => d.alongX && Math.abs(d.c - BOH_DOORS.restroomF) < 0.01); breakDoor ??= doors.find(d => d.alongX && Math.abs(d.c - BOH_DOORS.breakroom) < 0.01); closetDoor ??= doors.find(d => !d.alongX && Math.abs(d.at - CLOSET.x0) < 0.01);
-  const links = [["store", "out", front], ["store", "hall", hallWay], ["hall", "restroom", open(restDoor) || open(restFDoor)], ["hall", "breakroom", open(breakDoor)], ["hall", "closet", open(closetDoor)], ["hall", "lobby", open(hallDoor) || nearPort], ["lobby", "theater", open(cinemaDoor) || player.inBooth], ["theater", "out", fireExit.a > 0], ["store", "out", storeExit.a > 0]];   // (the emergency exit, open: out to its stairwell)   // (the booth's window looks out over the house)
+  // (the office's window, its blinds shut: they and the panel behind them stand in for the room, so it isn't drawn for nothing. See officeFx.shutter)
+  const links = [["store", "out", front], ["store", "hall", hallWay], ["hall", "restroom", open(restDoor) || open(restFDoor)], ["hall", "breakroom", open(breakDoor)], ["hall", "closet", open(closetDoor)], ["breakroom", "office", Math.abs(officeFx.door.a) > 0.01 || officeFx.blinds.some(b => b.k > 0.03)], ["hall", "lobby", open(hallDoor) || nearPort], ["lobby", "theater", open(cinemaDoor) || player.inBooth], ["theater", "out", fireExit.a > 0], ["store", "out", storeExit.a > 0]];   // (the emergency exit, open: out to its stairwell)   // (the booth's window looks out over the house)
   const seen = new Set([player.onRoof ? "out" : roomAt(camera.position.x, camera.position.z)]);   // (on the roof: just the outdoors, and the closet down the hatch)
   roof.g.visible = player.onRoof || !!roof.climb;
   if (!player.onRoof) for (let grew = true; grew;) { grew = false; for (const [a, b, on] of links) if (on && seen.has(a) !== seen.has(b)) { seen.add(a); seen.add(b); grew = true; } }
@@ -213,7 +215,7 @@ function regionTick() {
 let clockT = 0;
 const ambFwd = new THREE.Vector3(), coolerSndAt = new THREE.Vector3();
 let coolerWas = false;
-const AMB_ZONES = [["front", 0, 3.45, 3.5], ["aisles", -4, 3.45, 13], ["aisles", 5, 3.45, 16], ["lounge", 0, 3.45, 22.5], ["hall", 5.7, 2.6, 29], ["breakroom", 8.4, 2.6, 32.4],
+const AMB_ZONES = [["front", 0, 3.45, 3.5], ["aisles", -4, 3.45, 13], ["aisles", 5, 3.45, 16], ["lounge", 0, 3.45, 22.5], ["hall", 5.7, 2.6, 29], ["breakroom", 8.1, 2.6, 31.05], ["office", 8.4, 2.6, 33.7],
   ["restroom", 3.9, 2.6, 32.4], ["lobby", -2.5, 3, 31.5], ["theater", -3, 5, 40]].map(([zone, x, y, z]) => ({ zone, x, y, z, level: 0 }));   // a hum over each light zone
 let paused = false, pausedTape = false;          // the pause screen's up: nothing moves
 function ambTick(dt) {
@@ -251,6 +253,7 @@ async function boot() {
   const texs = new Set(); scene.traverse(o => { if (o.material) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture) texs.add(v); });
   let i = 0; for (const t of texs) { renderer.initTexture(t); if (++i % 16 === 0) { bar(0.85 + 0.13 * i / texs.size, "WARMING UP"); await frame(); } }
   hide = showAll(); renderWithBloom(); hide();
+  for (const c of officeFx.sec.cams) { secFeedRender(c); await frame(); }   // (a first look from each security camera, so the monitors have a picture when you walk in)
   stand.forEach(c => { c.group.removeFromParent(); c.dispose(); });   // (not scene.remove: roomSort may have filed them in a room by now, and they stood there for good)
   booted = true; hint.style.display = "none"; $("mainMenu").hidden = false;
 }
@@ -327,6 +330,9 @@ renderer.setAnimationLoop(() => {
       r += zc[i]; g += zc[i + 1]; b += zc[i + 2];
     }
     tvLight.avg.setRGB(r / 9, g / 9, b / 9);
+    const tc = TVU.uThZoneC.value;                 // the theater screen's patches, eased the same way
+    for (let i = 0; i < tc.length; i++) tc[i] += (thZoneTarget[i] - tc[i]) * k;
+    TVU.uThGain.value = tvLight.base;
     const on = tvLight.base * (lightsOut ? 1 : 0.35);    // the fluorescents wash most of it out
     TVU.uTvGain.value = on * TV_GAIN;
     TVU.uTvAmb.value.copy(tvLight.avg).multiplyScalar(on * TV_AMB);
@@ -367,7 +373,7 @@ renderer.setAnimationLoop(() => {
     d.rattle = Math.max(0, d.rattle - dt);
     d.pivot.rotation.y = d.base + d.a + (d.rattle ? 0.012 * Math.sin(d.rattle * 70) : 0);
   }
-  move(dt); moveTick(); bathTick(dt); breakroomTick(dt);
+  move(dt); moveTick(); bathTick(dt); breakroomTick(dt); officeTick(dt);
   if (!player.onRoof && inv.some(e => e.kind === "tape" && !e.ref.desens) && Math.abs(player.x) < 2 && (gateLastZ - GATE_Z) * (player.z - GATE_Z) < 0) startGateAlarm();   // carried a tape through the gates
   gateLastZ = player.z;
   if (gateAlarm.on) { gateAlarm.t += dt; gateLed.color.set(Math.floor(gateAlarm.t * 5) % 2 ? 0x2a0000 : 0xff1a1a); }
@@ -435,9 +441,9 @@ renderer.setAnimationLoop(() => {
   regionTick();
   lightsTick(dt);
   ambTick(dt);
-  if (booted) { const handBack = meHandFollow(); renderWithBloom(); handBack?.(); }   // (the store ticks along from the start; it's drawn once boot's ready)
+  if (booted) { const handBack = meHandFollow(); secFeedsTick(); renderWithBloom(); handBack?.(); }   // (the store ticks along from the start; it's drawn once boot's ready)
 });
-window.__t = { together, togetherOpen, arcade, arcadeStart, arcadeStop, mcFire, shift, bulb, tonyLightsTick, siKey, siTick, asTick, LOT, cmSleep, roomAt, lotCars: () => carsOut?.all(), tony, tonyE, TONY_IN, cm, CUSTOMER, invSync, cmTrail, SEARCHES, cmSearch, cmNoSale, invRemove, cmTakeFrom, cmSpentTick, INV_MAX, cmTrailSet, pickupMesh, TV, cmRecommend, onShelfCopy, cmTeeOff, cmHelped, cmMorning, putBack, strays, misshelve, cmTicket, cmShowTick, show, SHOW, cmComboKey, COMBOS, cmTermOpen, cmTermKey, cmSpill, cmSearchBin, cmSlip, cmMoneyDrop, pickupMeshes, redNights: () => redNights, setRedNights: n => { redNights = n; }, cmPay, cmCaught, cmSees, cmStaffOnly, cmPickUp, PICKUPS, KEYED, ITEMS, becomeCustomer, cmNextDay, outBlocked, blocked, carsOut: () => carsOut, golfLost, roof, roofClimb, backLadderE, backLadderDrop, decorDraw, decor, postersSwap, posterFor, WX, wxDrifts, weatherTick, wxPlan, walkers, walkerTick, walkerMake, pizzaRun, npcStyle, custTick: dt => custTick(dt), exteriorTick: dt => exteriorTick(dt), parkLot: (d, b) => parkLot(d, b), passCar: c => passCar(c), driveIn: (l, f) => driveIn(l, f), driveOut: c => driveOut(c), carNew: () => carNew(), sfxOut, shiftDate, season, calendarDraw, corkDraw,
+window.__t = { fallStart, fallNow: () => fall, fallTick, fallPlan, fallSurface, fallClear: () => { fall = null; me.setBend(); player.airH = 0; }, FALL, lowBlocker, spillTick, officeFx, officeSave, officeLoad, blindsToggle, secPress, together, togetherOpen, arcade, arcadeStart, arcadeStop, mcFire, shift, bulb, tonyLightsTick, siKey, siTick, asTick, LOT, cmSleep, roomAt, lotCars: () => carsOut?.all(), tony, tonyE, TONY_IN, cm, CUSTOMER, invSync, cmTrail, SEARCHES, cmSearch, cmNoSale, invRemove, cmTakeFrom, cmSpentTick, INV_MAX, cmTrailSet, pickupMesh, TV, cmRecommend, onShelfCopy, cmTeeOff, cmHelped, cmMorning, putBack, strays, misshelve, cmTicket, cmShowTick, show, SHOW, cmComboKey, COMBOS, cmTermOpen, cmTermKey, cmSpill, cmSearchBin, cmSlip, cmMoneyDrop, pickupMeshes, redNights: () => redNights, setRedNights: n => { redNights = n; }, cmPay, cmCaught, cmSees, cmStaffOnly, cmPickUp, PICKUPS, KEYED, ITEMS, becomeCustomer, cmNextDay, outBlocked, blocked, carsOut: () => carsOut, golfLost, roof, roofClimb, backLadderE, backLadderDrop, decorDraw, decor, postersSwap, posterFor, WX, wxDrifts, weatherTick, wxPlan, walkers, walkerTick, walkerMake, pizzaRun, npcStyle, custTick: dt => custTick(dt), exteriorTick: dt => exteriorTick(dt), parkLot: (d, b) => parkLot(d, b), passCar: c => passCar(c), driveIn: (l, f) => driveIn(l, f), driveOut: c => driveOut(c), carNew: () => carNew(), sfxOut, shiftDate, season, calendarDraw, corkDraw,
   catalog, pickup, onE, player, playEpisode, eject, boxState, tapeBox, media, mediaDown, mediaUp, togglePause, tvHear, hearRoomAt, fireExit, storeExit, fireExitUse, exitDoorTick, frontDoor, jump, jumpStart, jumpTick, WHEEL, wheelOpen, wheelMouse, wheelClick, WX,
   held: () => held, playing: () => playing, returnBin,
   setAim: v => { aimTV = v; },

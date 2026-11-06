@@ -327,8 +327,14 @@ window.StoreAim = {
 function pickHover() {
   if (arcade.on) { $("hoverTip").style.display = "none"; highlight.visible = false; return; }   // (playing Space Invaders: nothing else to aim at)
   aimPostit = null; aimNotepad = false;
-  hovered = null; aimStool = false; aimPickup = null; aimTony = null; aimBed = false; aimFireExit = null; cm.comboOf = null; aimTV = false; aimLamp = null; aimCouch = false; aimReturns = false; aimSnack = null; aimFlap = null; aimCooler = false; aimPop = null; aimTrash = false; aimDoor = null; aimPOS = false; aimSlot = false; aimRewinder = null; aimBell = false; aimDesens = false; aimCutout = false; aimCustomer = false; aimLock = false; aimEmp = false; aimSwitch = null; aimDrawer = false; aimExit = false; aimPrinter = false; aimStockSlot = null; aimCupboard = null; aimBox = null; aimMess = null; aimStray = null; aimPhone = false; aimHolds = false; aimBoard = false; aimMove = null; aimToilet = false; aimSink = false; aimTowels = false; aimBin = null; aimBag = null; aimChute = false; aimTool = null; aimDead = null; aimLadder = false; aimLadderHome = false;
+  hovered = null; aimStool = false; aimPickup = null; aimTony = null; aimBed = false; aimFireExit = null; cm.comboOf = null; aimBlinds = null; aimSec = null; aimTV = false; aimLamp = null; aimCouch = false; aimReturns = false; aimSnack = null; aimFlap = null; aimCooler = false; aimPop = null; aimTrash = false; aimDoor = null; aimPOS = false; aimSlot = false; aimRewinder = null; aimBell = false; aimDesens = false; aimCutout = false; aimCustomer = false; aimLock = false; aimEmp = false; aimSwitch = null; aimDrawer = false; aimExit = false; aimPrinter = false; aimStockSlot = null; aimCupboard = null; aimBox = null; aimMess = null; aimStray = null; aimPhone = false; aimHolds = false; aimBoard = false; aimMove = null; aimToilet = false; aimSink = false; aimTowels = false; aimBin = null; aimBag = null; aimChute = false; aimTool = null; aimDead = null; aimLadder = false; aimLadderHome = false;
   if (document.pointerLockElement !== canvas) { highlight.visible = false; $("hoverTip").style.display = "none"; return; }
+  if (seated && seatAt?.office && !inspecting) {  // in the manager's chair: the switcher's in reach (see onE)
+    highlight.visible = false; raycaster.setFromCamera(aimNDC, camera);
+    aimSec = raycaster.intersectObjects(aimables, false).find(h => h.distance < 2.2 && h.object.userData.secBtn)?.object.userData.secBtn || null;
+    const tip = $("hoverTip"); tip.style.display = aimSec ? "block" : "none"; if (aimSec) tip.innerHTML = secTip(aimSec);
+    return;
+  }
   if (inspecting || seated || onStool) { highlight.visible = false; $("hoverTip").style.display = "none"; return; }
   if (cmove.item) {                           // carrying a counter thing: where it'd go
     highlight.visible = false; const tip = $("hoverTip"); tip.style.display = "block";
@@ -500,6 +506,8 @@ function pickHover() {
     else if (aim?.object.userData.cutout && aim.distance < 2.6) aimCutout = true;
     else if (aim?.object.userData.frontLock && aim.distance < 2.2) aimLock = true;
     else if (aim?.object.userData.exitDoor && aim.distance < 2.4 && shift.h >= 23) aimExit = true;   // near close: the way home
+    else if (aim?.object.userData.blinds && aim.distance < 2.2) aimBlinds = aim.object.userData.blinds;
+    else if (aim?.object.userData.secBtn && aim.distance < 2.2) aimSec = aim.object.userData.secBtn;
     else if (aim?.object.userData.lightZone && aim.distance < 2.2) aimSwitch = aim.object.userData.lightZone;
     else if (aim?.object.userData.stool && aim.distance < 2.2) aimStool = true;
     else if (aim?.object.userData.employee && aim.distance < 2.8) aimEmp = aim.object.userData.employee;   // (the employee themself)
@@ -533,6 +541,8 @@ function pickHover() {
     else if (aimEmp) tip.innerHTML = withEmp(aimEmp, () => emp.state === "stoolSit" ? `E — give ${emp.first} a spin<div class="cat">On the stool${emp.dizzy > 0.5 ? " · looking a bit green" : ""}</div>` : emp.state === "watching" ? `${emp.first}<div class="cat">Off the clock · watching with you</div>` : emp.task === "register"
       ? (returnBin.length ? `E — ask ${emp.first} to process returns<div class="cat">${returnBin.length} in the bin · on the register</div>` : `${emp.first}<div class="cat">On the register · returns bin is empty</div>`)
       : `E — send ${emp.first} back to the register<div class="cat">Processing returns · ${returnBin.length + emp.carry.length} to go</div>`) + `<div class="cat">${empSummary(aimEmp)}</div>`;
+    else if (aimBlinds) tip.innerHTML = `E — ${aimBlinds.open ? "close" : "open"} the blinds`;
+    else if (aimSec) tip.innerHTML = secTip(aimSec);
     else if (aimSwitch) tip.innerHTML = `E — turn the ${ZONE_NAMES[aimSwitch]} lights ${zoneOn[aimSwitch] ? "off" : "on"}`
       + (switchPlate[aimSwitch].length > 1 ? `<br>Hold E — turn them all ${zoneOn[switchPlate[aimSwitch][0]] ? "off" : "on"}` : "");
     else if (aimStool) tip.innerHTML = stool.by ? `${stool.by.first}'s using the stool` : eHoldTimer ? "Lifting…" : "E — sit on the stool<br>Hold E — pick it up";

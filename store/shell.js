@@ -201,6 +201,14 @@ wall(BX0, XR, BZ1, true, BH, mat.wall);                                   // rea
 wall(BX0, XR, HZ, true, BH, mat.wall, [BOH_DOORS.restroomF, BOH_DOORS.restroom, BOH_DOORS.breakroom]);   // hall | rooms
 wall(HZ, BZ1, SX, false, BH, mat.wall);                                   // restrooms | break room
 wall(HZ, BZ1, BOH.rrX, false, BH, mat.wall);                              // women's | men's
+// break room | manager's office: the door (made in store/office.js), then the window, its sill and head solid wall, the opening glazed there too
+wall(SX, OFFICE_WIN.x0, BOH.officeZ, true, BH, mat.wall, [{ c: BOH_DOORS.office, w: OFFICE_DOOR_W }]);
+wall(OFFICE_WIN.x1, XR, BOH.officeZ, true, BH, mat.wall);
+{
+  const w = OFFICE_WIN, c = (w.x0 + w.x1) / 2, len = w.x1 - w.x0, t = WALL_T / 2 + WALL_PAD;
+  aimBlockers.push(box(len, w.sill, WALL_T, mat.wall, c, w.sill / 2, BOH.officeZ), box(len, BH - w.head, WALL_T, mat.wall, c, (w.head + BH) / 2, BOH.officeZ));
+  colliders.push({ x0: w.x0, x1: w.x1, z0: BOH.officeZ - t, z1: BOH.officeZ + t, y1: BH });
+}
 wall(BZ0, HZ, CLOSET.x0, false, BH, mat.wall, [{ c: BOH_DOORS.closet, w: CLOSET.doorW }]);   // across the hall's end: the janitor's closet door
 const vctTex = makeTexture((ctx, W, H) => {   // speckled vinyl composition tile, 8 x 8 30 cm squares per repeat
   const n = 8, s = W / n, cols = ["#d8d2c3", "#cec7b5", "#e1dccf", "#c9c3b4"];
@@ -221,7 +229,7 @@ const floorPatch = (tex, tileM, x0, x1, z0, z1) => {
 };
 floorPatch(vctTex, 2.4, BX0, CLOSET.x0, BZ0, HZ);                         // hall — starts right where the store's carpet ends, mid-opening
 floorPatch(bathTex, 0.8, BX0, SX, HZ, BZ1);                               // restroom
-floorPatch(vctTex, 2.4, SX, XR, HZ, BZ1);                                 // break room
+floorPatch(vctTex, 2.4, SX, XR, HZ, BOH.officeZ);                         // break room (the office has its carpet: store/office.js)
 // ceilings: the hall gets its own, its grid shifted so a row of tiles runs down the middle between
 // the walls (the hall lights sit in it) with a sliver of tile either side; the rooms keep the store's grid
 const hallMid = (BZ0 + WALL_T / 2 + HZ - WALL_T / 2) / 2, rowStart = hallMid - CEIL_TILE.z / 2;

@@ -99,6 +99,7 @@ function switchSnap(on) {
   // just inside each back room, on the wall with the door, latch side (the doors hinge on their east side)
   const inside = BOH.hallZ + WALL_T / 2;
   plate(BOH_DOORS.breakroom - DOOR_W / 2 - 0.25, 1.22, inside, 0, ["breakroom"]);
+  plate(OFFICE_WIN.x0 - 0.08, 1.22, BOH.officeZ + WALL_T / 2, 0, ["office"]);              // between the office's door and its window
   plate(BOH_DOORS.restroom - DOOR_W / 2 - 0.25, 1.22, inside, 0, ["restroom"]);
   plate(BOH_DOORS.restroomF - DOOR_W / 2 - 0.25, 1.22, inside, 0, ["restroom"]);          // (the two restrooms: one circuit)
   plate(CINEMA_DOOR + 1.07, 1.22, BOH.z1 - WALL_T / 2, Math.PI, ["lobby", "theater"]);

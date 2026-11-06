@@ -402,7 +402,7 @@
   for (const t of INPUT) addEventListener(t, hold, true);
   for (const f of ["store/core", "store/shell", "store/backrooms", "store/theater", "exterior/lot", "exterior/grounds", "exterior/serviceroad", "store/lobby", "store/shelves", "store/theaterlobby", "store/lounge",
     "store/shift", "exterior/sky", "store/clock", "store/player", "store/shoppers", "store/staff", "store/checkout", "store/phone", "tonys/light", "tonys/inside", "tonys/cabinets", "tonys/arcade", "tonys/missile", "tonys/yard",
-    "tonys/outside", "store/roofkit", "store/roof", "store/chores", "store/tapebox", "store/tv", "store/title", "store/customer-mode", "store/wheel", "store/together", "store/main"]) {
+    "tonys/outside", "store/roofkit", "store/roof", "store/office", "store/chores", "store/tapebox", "store/tv", "store/title", "store/customer-mode", "store/wheel", "store/together", "store/main"]) {
     const s = document.createElement("script"); s.src = `${f}.js`; s.async = false;   // async off: run in order, not as they arrive
     if (f === "store/main") s.onload = s.onerror = () => { for (const t of INPUT) removeEventListener(t, hold, true); };
     document.body.appendChild(s);

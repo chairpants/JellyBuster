@@ -76,7 +76,7 @@ const KEYED = [
 const keyedOf = d => KEYED.find(k => k.door() === d);
 // ---- the padlocks: a combination, typed on the number keys while you're looking at the lock ----
 const COMBOS = {
-  locker: { name: "Ray's locker", code: "", at: [BOH.splitX + 0.49, 0.93, 31.32], gives: "badge", open: "The padlock clicks open. Ray's locker: a can of Skoal, a Walkman, and his employee badge" },
+  locker: { name: "Ray's locker", code: "", at: [BOH.splitX + 0.49, 0.93, 31.02], gives: "badge", open: "The padlock clicks open. Ray's locker: a can of Skoal, a Walkman, and his employee badge" },
   hatch: { name: "the roof hatch", code: "", open: "The padlock on the hatch drops open. The roof's yours" },
 };
 const comboDone = c => c === COMBOS.hatch ? cm.hatch : cm.found.has("combo:locker");
@@ -117,10 +117,10 @@ const SEARCHES = {
   tank: { area: "public", search: "under the toilet tank lid", at: () => [BOH.splitX - 0.55, 0.82, 34.79], r: 0.2 },
   "bin:restroom": { area: "public", bin: "restroom" },
   "bin:lobby": { area: "public", bin: "lobby" },
-  jacket: { area: "break", search: "the jean jacket's pockets", at: () => [BOH.splitX + 0.17, 1.3, 31.97], r: 0.2 },
-  vest: { area: "break", search: "the spare vest's pocket", at: () => [BOH.splitX + 0.17, 1.38, 32.66], r: 0.18 },
-  pizza: { area: "break", search: "under the empty Tony's box", at: () => [BOH.splitX + 2.02, 0.79, 31.67], r: 0.2 },
-  timecard: { area: "break", search: "the time cards in the rack", at: () => [BOH_DOORS.breakroom + 1.53, 1.32, 30.0], r: 0.22 },
+  jacket: { area: "break", search: "the jean jacket's pockets", at: () => [BOH.splitX + 0.17, 1.3, 31.67], r: 0.2 },
+  vest: { area: "break", search: "the spare vest's pocket", at: () => [BOH.splitX + 0.17, 1.38, 32.06], r: 0.18 },
+  pizza: { area: "break", search: "under the empty Tony's box", at: () => [BOH.splitX + 4.2, 0.79, 30.56], r: 0.2 },
+  timecard: { area: "break", search: "the time cards in the rack", at: () => [BOH.splitX + 1.22, 1.32, 30.0], r: 0.22 },
   keyboard: { area: "counter", search: "under the register keyboard", at: () => [-5.45, 1.14, 3.72], r: 0.14 },
   pad: { area: "counter", search: "under the desensitizer pad", at: () => [DESENS_AT.x, 1.13, DESENS_AT.z], r: 0.13 },
   printer: { area: "counter", search: "around the receipt printer", at: () => [PRN_AT.x, 1.16, PRN_AT.z], r: 0.13 },
@@ -229,7 +229,7 @@ function cmStaffOnly(x = player.x, z = player.z) {
   if (player.onRoof) return null;                 // (nobody's up there to see)
   if (x < -2.6 && z > 0 && z < 3.65) return "behind the counter";
   const lz = player.inBooth ? "booth" : lightZoneAt(x, z);
-  return lz === "breakroom" || lz === "closet" || lz === "booth" || lz === "stairwell" ? `in the ${ZONE_NAMES[lz]}` : null;   // (the booth and its stairs too: staff only)
+  return lz === "breakroom" || lz === "office" || lz === "closet" || lz === "booth" || lz === "stairwell" ? `in the ${ZONE_NAMES[lz]}` : null;   // (the booth and its stairs too: staff only)
 }
 const cmBehindCounter = (x, z) => x < -2.6 && z > 0 && z < 3.65;
 // can e see you? Looking your way (or right next to you), close enough, the light on where you are (or close), and

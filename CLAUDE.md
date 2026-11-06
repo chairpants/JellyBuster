@@ -19,6 +19,7 @@ Sections inside a file start with a `// ---- name ----` comment; grep for the na
 | Sizes and positions everything else is built from (`WALL_L`, `DOOR_W`, `LOT`, colours) | `store/core.js`: palette / constants |
 | `box` / `solid` / `wall` / `makeDoor`, the outer walls, the back hall | `store/shell.js` |
 | Janitor's closet, break room (lockers, table, kitchenette), the women's and men's restrooms (stalls, urinal, sinks) | `store/backrooms.js` |
+| The manager's office behind the break room (`BOH.officeZ`): shag, ceiling, desk, chair, computer, filing cabinet; the window and its blinds; the security desk, the cameras out in the store (`SEC_CAMS`) and their feeds. The office's paneled walls are the "paint" kind in `store/core.js` | `store/office.js` |
 | The theater lobby's shell, the auditorium and its seats, the projection booth over the lobby and its stairwell (`BOOTH`, `stairsAt`) | `store/theater.js` |
 | The lobby's dressing: concession stand, menu board, ropes, the NOW PLAYING poster | `store/theaterlobby.js` |
 | The lot, stalls, curbs, driveways, the road, street lamps, parked cars | `exterior/lot.js` |

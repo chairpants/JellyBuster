@@ -355,7 +355,7 @@ const bagsDown = [];                              // set down somewhere: { bin, 
 const bagHand = new THREE.Group();
 const binList = () => Object.values(trashBins);
 const binFull = b => b.n >= b.cap;
-const binNear = (x, z) => z < STORE.z ? trashBins.lobby : x < BOH.x0 || z > BOH.z1 ? trashBins.theater : x < BOH.rrX ? trashBins.restroomF : x < BOH.splitX ? trashBins.restroom : trashBins.breakroom;
+const binNear = (x, z) => z < STORE.z ? trashBins.lobby : x < BOH.x0 || z > BOH.z1 ? trashBins.theater : x < BOH.rrX ? trashBins.restroomF : x < BOH.splitX ? trashBins.restroom : z > BOH.officeZ ? trashBins.office : trashBins.breakroom;
 const unaim = o => o.traverse(m => { const i = aimables.indexOf(m); if (i >= 0) aimables.splice(i, 1); });
 for (const b of binList()) {
   b.n = Math.min(b.cap, SAVE?.trash?.bins?.[b.id] ?? Math.floor(b.cap * 0.3 * Math.random())); b.acc = 0;
@@ -495,7 +495,7 @@ function empToChute() {
 function trashTick(dt) {
   if (shift.h < SHIFT.close && !paused) {          // the day's trash: the customers' through the lobby bin, the staff's lunches, paper towels
     const hrs = dt / SHIFT.hour, inStore = custs.length;
-    const rate = { lobby: 0.9 * inStore, breakroom: 0.15 + 0.25 * staff.length, restroom: 0.04 * inStore, restroomF: 0.04 * inStore, theater: owned("theater") ? 0.2 * inStore : 0, counter: 0.06 + 0.04 * staff.length };
+    const rate = { lobby: 0.9 * inStore, breakroom: 0.15 + 0.25 * staff.length, restroom: 0.04 * inStore, restroomF: 0.04 * inStore, theater: owned("theater") ? 0.2 * inStore : 0, counter: 0.06 + 0.04 * staff.length, office: 0.04 };
     for (const b of binList()) if ((b.acc += hrs * (rate[b.id] || 0)) >= 1) {
       b.acc -= 1; trashAdd(b);
       if (b.id === "lobby" && custs.some(k => k.c && Math.hypot(k.c.group.position.x - b.x, k.c.group.position.z - b.z) < 2)) trashFlapT = 0.5;   // somebody right there: the flap swings

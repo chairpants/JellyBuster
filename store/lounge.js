@@ -9,6 +9,7 @@ const TV_GAIN = 6.5, TV_AMB = 0.875;                           // direct throw /
 const TV_SCREEN_Z = TV.z - 0.558 - 0.01;                       // just in front of the glass
 for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) TVU.uTvZoneP.value.set([0.6 - 0.6 * c, 1.35 - 0.4 * r, TV_SCREEN_Z], (r * 3 + c) * 3);
 TVU.uTvRoom.value.set(WALL_L, STORE.x, STORE.h + 0.05, TV_SCREEN_Z);   // +5cm: the ceiling sits exactly at STORE.h, and a hard cutoff there flickers in and out
+const thZoneTarget = new Float32Array(TH_COLS * TH_ROWS * 3).fill(0.3);   // the same for the theater screen's patches
 const tvZoneTarget = new Float32Array(27).fill(0.3);           // latest screen sample (linear); uTvZoneC eases toward it every frame
 // a real TV throws light behind itself too — the screen patches above only
 // light what's in front of the glass, so a short point light covers the
@@ -222,12 +223,16 @@ function drawOsd(ctx, t) {                     // VCR-style OSD, top left
 // (a big canvas sent up every frame cost more than everything else in the room). What's written on the picture goes on a
 // layer of its own, redrawn only when it changes. The screen under it keeps the shared canvas, for the TV's menu
 let filmPlane = null, filmText = null, filmKey = "";
+const filmBackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 const filmTextCtx = (() => { const c = document.createElement("canvas"); c.width = 960; c.height = 640; const g = c.getContext("2d", { willReadFrequently: true }); g.scale(2, 2); return g; })();
 const filmPic = { value: new THREE.Vector4(1, 1, 1, 0) };   // the TV's picture settings: brightness, contrast, color, tint
 function filmTick() {
   const on = !!filmPlane && !!playing && !tvMenu && video.videoWidth > 0;
   if (!filmPlane) return;
   filmPlane.visible = on;
+  // the screen behind: plain black while the film's on it. Its own picture (the TV's canvas, scanlines and all) a hair behind the
+  // film fought it for the glow pass's depth test and came through as moire that changed with every step
+  if (on) theaterScreenMesh.material = filmBackMat; else if (playing) theaterScreenMesh.material = videoMat;   // (no tape: the main loop's)
   if (!on) { filmText.visible = false; return; }
   const { width: SW, height: SH } = theaterScreenMesh.geometry.parameters, a = video.videoWidth / video.videoHeight;
   filmPlane.scale.set(a > SW / SH ? SW : SH * a, a > SW / SH ? SW / a : SH, 1);
@@ -556,6 +561,7 @@ const crtGlows = [];                       // one real light per ceiling CRT clu
           const vec3 k = vec3(0.57735); float cs = cos(uPic.w), sn = sin(uPic.w);
           diffuseColor.rgb = clamp(c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs), 0.0, 1.0); }`);
     };
+    glowDraw(m);                                   // (the glow pass redraws it against the main pass's depth: pulled forward so it all passes, not in a shifting pattern)
     filmPlane = glow(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m)); filmPlane.position.z = 0.01; filmPlane.visible = false; theaterScreenMesh.add(filmPlane);
     const { width: SW, height: SH } = theaterScreenMesh.geometry.parameters, words = new THREE.CanvasTexture(filmTextCtx.canvas); words.colorSpace = THREE.SRGBColorSpace;
     filmText = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.MeshBasicMaterial({ map: words, transparent: true, depthWrite: false })); filmText.position.z = 0.02; filmText.visible = false; theaterScreenMesh.add(filmText);
@@ -707,7 +713,7 @@ function lightingTick(dt) {                       // fluorescents restriking, zo
 function applyLighting() {
   const Z = TVU.uZone.value, B = TVU.uBoh.value;
   Z.set(zoneLvl.front, zoneLvl.aisles, zoneLvl.lounge, tod.level);
-  B.set(zoneLvl.hall, zoneLvl.breakroom, zoneLvl.restroom, zoneLvl.closet);
+  B.set(zoneLvl.hall, zoneLvl.breakroom, zoneLvl.restroom, zoneLvl.closet); TVU.uOffice.value = zoneLvl.office;
   closetBulb.mat?.color.set(zoneOn.closet ? 0xfff2c4 : 0x3a3833);
   boothGlow.lamps?.color.set(zoneOn.booth ? 0xffd890 : 0x3a3833); boothGlow.stairs?.color.set(zoneOn.stairwell ? 0xffd890 : 0x3a3833); boothGlow.red?.color.set(zoneOn.booth ? 0x2a0806 : 0xff2a1a);
   TVU.uThLight.value.set(zoneLvl.lobby, zoneLvl.theater, zoneLvl.booth, zoneLvl.stairwell);

@@ -173,7 +173,7 @@ function tgSend() {
   const g = me.group.position, r = v => Math.round(v * 1000) / 1000;
   const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : null;
   const pose = fall ? 3 : sit ? 2 : keys.has("KeyC") ? 1 : 0;
-  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0])); } catch {}
+  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.prone ? -fall.tilt : fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0])); } catch {}
 }
 function tgOnCtl(data, mine) {
   const T = together; if (mine !== T.try) return;
@@ -198,7 +198,7 @@ function tgOnPos(data, mine) {
   if (Math.abs(a[0]) > 500 || Math.abs(a[1]) > 100 || Math.abs(a[2]) > 500) return;   // (nowhere in this world)
   P.to = { x: a[0], y: a[1], z: a[2], ry: a[3] };
   P.c.setAir(!!a[7]);
-  P.tilt = a[4] === 3 ? Math.max(0, Math.min(1, a[5])) : 0;   // (down on their back: see fall, store/player.js)
+  P.tilt = a[4] === 3 ? Math.max(0, Math.min(1, Math.abs(a[5]))) : 0; P.prone = a[4] === 3 && a[5] < 0;   // (down on their back, or their face: see fall, store/player.js)
   if (a[4] !== P.pose || (a[4] !== 3 && (a[5] !== P.hipY || a[6] !== P.tuck))) {
     P.pose = a[4]; P.hipY = a[5]; P.tuck = a[6];
     P.c.setPose(a[4] === 2 ? "sit" : a[4] === 1 ? "crouch" : "idle", a[4] === 2 ? { ...(a[5] && { hipY: a[5] }), ...(a[6] && { tuck: a[6] }) } : undefined);
@@ -243,9 +243,9 @@ function togetherTick(dt) {                     // the main loop: eases them to 
   const T = together, P = T.peer; if (!P) return;
   if (performance.now() - P.heard > TOGETHER.silentFor) return tgLost();
   const g = P.c.group; if (!P.to) return;
-  g.rotation.order = "YXZ"; g.rotation.x += (-(P.tilt || 0) * Math.PI / 2 - g.rotation.x) * Math.min(1, dt * 12);
+  g.rotation.order = "YXZ"; g.rotation.x += ((P.prone ? 1 : -1) * (P.tilt || 0) * Math.PI / 2 - g.rotation.x) * Math.min(1, dt * 12);
   if (P.tilt > 0.4) {                            // (down: folded round what's there, in this copy of the store too. Their head's the far end from the feet)
-    const fx = Math.sin(P.to.ry), fz = Math.cos(P.to.ry), b = bodyBend(P.to.x - fx * FALL.long, P.to.z - fz * FALL.long, fx, fz, P.to.ry); P.c.setBend(b.legs, b.arm0, b.arm1);
+    const dn = P.prone ? -1 : 1, fx = dn * Math.sin(P.to.ry), fz = dn * Math.cos(P.to.ry), b = bodyBend(P.to.x - fx * FALL.long, P.to.z - fz * FALL.long, fx, fz, P.to.ry); P.c.setBend(b.legs, b.arm0, b.arm1);
   } else P.c.setBend();
   const dx = P.to.x - g.position.x, dy = P.to.y - g.position.y, dz = P.to.z - g.position.z, d = Math.hypot(dx, dz);
   if (!g.visible || d > 6 || Math.abs(dy) > 3) {   // first seen, or they've gone further than anybody walks in a moment: no sliding over there

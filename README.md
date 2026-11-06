@@ -269,6 +269,7 @@ Everything runs as plain `<script>` files loaded in order. There are no ES modul
 | `store/core.js` | Constants and the palette, the renderer, the TV-light shader, bloom, rewinding, canvas-texture helpers |
 | `store/shell.js` | The building: `box` / `solid` / `wall`, doors, the outer walls, the back hall |
 | `store/backrooms.js` | Janitor's closet, break room, restroom |
+| `store/office.js` | The manager's office: its blinds, the security cameras and monitors |
 | `store/theater.js` | The theater lobby and the theater |
 | `exterior/lot.js` | The lot, the road, the street outside |
 | `exterior/grounds.js` | Around the building: the grass, the dumpster, the cardboard bed behind it |

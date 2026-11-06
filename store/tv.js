@@ -178,6 +178,7 @@ function hearLinks() {                           // [room, room, x, z (the way t
   return [["store", "hall", BOH_DOORS.store, STORE.z, 0.55, 7000],
     ["hall", "restroom", BOH_DOORS.restroom, BOH.hallZ, ...inner(d => d.alongX && Math.abs(d.c - BOH_DOORS.restroom) < 0.01)],
     ["hall", "breakroom", BOH_DOORS.breakroom, BOH.hallZ, ...inner(d => d.alongX && Math.abs(d.c - BOH_DOORS.breakroom) < 0.01)],
+    ["breakroom", "office", BOH_DOORS.office, BOH.officeZ, ...inner(d => d.alongX && Math.abs(d.c - BOH_DOORS.office) < 0.01)],
     ["hall", "closet", CLOSET.x0, BOH_DOORS.closet, ...inner(d => !d.alongX && Math.abs(d.at - CLOSET.x0) < 0.01)],
     ["hall", "lobby", BOH.x0, BOH_DOORS.future, ...inner(d => d.push && !d.alongX)],
     ["lobby", "theater", CINEMA_DOOR, TALL.z1, ...inner(d => d.push && d.alongX)],
@@ -246,6 +247,7 @@ function onE() {
   if (ladder.on) { if (aimDead) ladder.fix = { d: aimDead, t: 0 }; else ladderDown(); return; }
   if (onStool) { stoolPush(); return; }
   if (aimStool && !stool.by) { stoolSit(); return; }
+  if (seated && aimSec) { secPress(aimSec); return; }   // (the manager's chair: within reach of the switcher)
   if (seated) {                             // E always stands you up
     player.x = stoodAt.x; player.z = stoodAt.z; player.yaw = stoodAt.yaw; seated = false; return;
   }
@@ -289,6 +291,8 @@ function onE() {
   if (aimHolds && held && !inspecting) { holdPlace(held); return; }
   if (aimHolds && !held) { holdPull(); return; }
   if (aimCustomer) { custInteract(aimCustomer); return; }
+  if (aimBlinds) { blindsToggle(aimBlinds); return; }
+  if (aimSec) { secPress(aimSec); return; }
   if (aimSwitch) { flipSwitch(aimSwitch); return; }
   if (aimFireExit) { fireExitUse(aimFireExit, aimExitDoor); return; }
   if (aimEmp && afterClose() && !aimEmp.leaving && aimEmp.state !== "toExit") { sendHome(aimEmp); return; }   // closed: off you go
@@ -337,24 +341,32 @@ function vcrUse() {                          // E on the TV or a VCR (the store'
   else if (playing) eject();
 }
 // TV light colors: every 150ms the screen canvas (already cropped,
-// letterboxed and filtered — exactly what's on the glass) is shrunk to 24x18
-// and averaged into the 3x3 zones the shader lights with; the main loop eases
-// toward each sample so the room doesn't visibly step between them
+// letterboxed and filtered — exactly what's on the glass) is shrunk to 24x24
+// and averaged into the 3x3 zones the TV lights with and the 6x4 patches the
+// theater screen does; the main loop eases toward each sample so the room
+// doesn't visibly step between them
 const glowCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-glowCtx.canvas.width = 24; glowCtx.canvas.height = 18;
+glowCtx.canvas.width = 24; glowCtx.canvas.height = 24;
 const tvTmp = new THREE.Color();
+const thCW = 24 / TH_COLS, thCH = 24 / TH_ROWS;   // (a theater patch, in pixels)
 setInterval(() => {
   if (!tvLight.base) return;
   try {
-    glowCtx.drawImage(videoCanvas, 0, 0, 24, 18);
-    const d = glowCtx.getImageData(0, 0, 24, 18).data, sum = new Float32Array(27);
-    for (let y = 0; y < 18; y++) for (let x = 0; x < 24; x++) {
-      const z = ((y / 6 | 0) * 3 + (x / 8 | 0)) * 3, p = (y * 24 + x) * 4;
+    glowCtx.drawImage(videoCanvas, 0, 0, 24, 24);
+    const d = glowCtx.getImageData(0, 0, 24, 24).data, sum = new Float32Array(27), th = new Float32Array(thZoneTarget.length);
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) {
+      const z = ((y / 8 | 0) * 3 + (x / 8 | 0)) * 3, t = ((y / thCH | 0) * TH_COLS + (x / thCW | 0)) * 3, p = (y * 24 + x) * 4;
       sum[z] += d[p]; sum[z + 1] += d[p + 1]; sum[z + 2] += d[p + 2];
+      th[t] += d[p]; th[t + 1] += d[p + 1]; th[t + 2] += d[p + 2];
     }
     for (let z = 0; z < 27; z += 3) {           // pixels are sRGB; the shader works in linear
-      tvTmp.setRGB(sum[z] / 12240, sum[z + 1] / 12240, sum[z + 2] / 12240, THREE.SRGBColorSpace);   // 48 px x 255
+      tvTmp.setRGB(sum[z] / 16320, sum[z + 1] / 16320, sum[z + 2] / 16320, THREE.SRGBColorSpace);   // 64 px x 255
       tvZoneTarget[z] = tvTmp.r; tvZoneTarget[z + 1] = tvTmp.g; tvZoneTarget[z + 2] = tvTmp.b;
+    }
+    const thN = thCW * thCH * 255;
+    for (let t = 0; t < th.length; t += 3) {
+      tvTmp.setRGB(th[t] / thN, th[t + 1] / thN, th[t + 2] / thN, THREE.SRGBColorSpace);
+      thZoneTarget[t] = tvTmp.r; thZoneTarget[t + 1] = tvTmp.g; thZoneTarget[t + 2] = tvTmp.b;
     }
   } catch { /* tainted frame: keep the last colors */ }
 }, 150);

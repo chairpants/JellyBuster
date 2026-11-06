@@ -237,16 +237,18 @@ const rr = textPlane("RESTROOMS", 1.0, 0.24, "#fff", "#00349c");         // over
 rr.material = new THREE.MeshLambertMaterial({ map: rr.material.map });
 rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y = Math.PI; scene.add(rr);
 
-// ---- break room, V2 (interior x SX+0.1..XR-0.1, z HZ+0.1..BZ1-0.1) ----
+// ---- break room, V3 (interior x SX+0.1..XR-0.1, z HZ+0.1..BOH.officeZ-0.1): half its old depth, the manager's office behind it ----
 // Lockers on the west wall (names on Dymo tape, a couple of padlocks, old poster tubes on top) and a coat rail past
-// them; the table mid-room in molded chairs, an empty Tony's box and the TV Guide on it; a kitchenette along the back
-// wall: oak cabinets with panelled doors, a sink sunk in the counter with a dish rack, a Mr. Coffee with its pot on,
-// a microwave blinking 12:00 since the last outage; the almond fridge in the corner under magnets. A TV/VCR up on a
-// bracket (on while someone's at lunch), the punch clock and its card rack by the door, a wall clock that keeps the
-// shift's time, the extinguisher, a first aid kit, the labor-law poster. The door swings in over x 8.0-9.1 up to
-// ~z 30.9, so that strip stays clear
+// them, the aprons on pegs beside the office door, the punch clock and its card rack on the hall wall by the lockers;
+// past the hall door, a small table end-on to that wall under the bulletin board, a molded chair either side of it, an empty Tony's box and
+// the TV Guide on it; a kitchenette on the back wall past the office's window: oak
+// cabinets with panelled doors, a sink sunk in the counter with a dish rack, a Mr. Coffee with its pot on, a microwave
+// blinking 12:00 since the last outage; the almond fridge in the corner under magnets. A TV/VCR up on a bracket (on
+// while someone's at lunch), the store's awards over the bulletin board, a wall clock that keeps the shift's time, the
+// extinguisher, a first aid kit, the labor-law poster. The hall door swings in over x 8.0-9.1 up to ~z 30.9, and the
+// lockers and the way to the office door (x 6.4-7.3) have the west end of the room to themselves
 {
-  const x0 = SX + 0.1, x1 = XR - 0.1, z0 = HZ + 0.1, z1 = BZ1 - 0.1;
+  const x0 = SX + 0.1, x1 = XR - 0.1, z0 = HZ + 0.1, z1 = BOH.officeZ - 0.1;
   const put = (geo, m, x, y, z, ry = 0, par = scene) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.y = ry; par.add(o); return o; };
   const bx = (w, h, d, m, x, y, z, par) => put(new THREE.BoxGeometry(w, h, d), m, x, y, z, 0, par);
   const cyl = (rt, rb, h, m, x, y, z, seg = 16, par) => put(new THREE.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, par);
@@ -264,7 +266,7 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
   const oakDk = lam(0x6e4c2a);
 
   // ---- lockers: four tall steel lockers facing +x, louvred vents, number plates, names, padlocks ----
-  const LD = 0.45, LW = 0.38, LH = 1.8, lz0 = z0 + 0.35;
+  const LD = 0.45, LW = 0.38, LH = 1.8, lz0 = z0 + 0.05;
   const vent = pic((ctx, W, H) => { ctx.fillStyle = "#5f7fa3"; ctx.fillRect(0, 0, W, H); for (let y = 6; y < H - 4; y += 10) { ctx.fillStyle = "#1e2a38"; ctx.fillRect(8, y, W - 16, 5); ctx.fillStyle = "#86a2c2"; ctx.fillRect(8, y + 5, W - 16, 1); } }, 128, 64);
   const NAMES = ["", "DANA", "RAY", ""];
   for (let i = 0; i < 4; i++) {
@@ -298,20 +300,34 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     bx(0.38, 0.52, 0.04, vb, 0, -0.27, 0, vs); bx(0.1, 0.1, 0.045, lam(0x0a1c4c), 0, -0.07, 0, vs);   // the vest, its neck
     bx(0.08, 0.025, 0.002, lam(0xf2c200), 0.09, -0.2, 0.022, vs);                               // the name tag
   }
+  // ---- the aprons: a peg rail on the back wall, beside the office door, two store aprons on it and an empty peg ----
+  {
+    const px0 = x0 + 0.03, px1 = BOH_DOORS.office - OFFICE_DOOR_W / 2 - 0.09, pc = (px0 + px1) / 2, py = 1.72, apronM = lam(0x24408e), strap = lam(0x1a2c63);
+    bx(px1 - px0, 0.07, 0.018, oakDk, pc, py, z1 - 0.009);
+    [-0.14, 0, 0.14].forEach((dx, i) => {
+      const p = cyl(0.008, 0.008, 0.05, oakDk, pc + dx, py, z1 - 0.04, 8); p.rotation.x = Math.PI / 2;
+      if (i === 1) return;
+      const a = grp(pc + dx, py - 0.02, z1 - 0.038, Math.PI);
+      bx(0.11, 0.3, 0.012, apronM, 0, -0.17, 0, a); bx(0.17, 0.42, 0.012, apronM, 0, -0.52, 0, a);   // the bib, the skirt
+      bx(0.012, 0.3, 0.008, strap, -0.05, -0.1, 0.008, a); bx(0.012, 0.3, 0.008, strap, 0.05, -0.1, 0.008, a);   // the neck loop
+      bx(0.1, 0.1, 0.003, lam(0x1b3274), 0, -0.56, 0.008, a);                                     // the pocket
+      bx(0.07, 0.03, 0.002, lam(0xf2c200), 0, -0.2, 0.008, a);                                    // the JellyBuster patch
+    });
+  }
 
-  // ---- table and four molded chairs ----
-  const tx = x0 + 1.6, tz = 31.75, TW = 1.2, TD = 0.8, TH = 0.74;
+  // ---- a small table and two molded chairs ----
+  const tx = x0 + 4.1, tz = z0 + 0.5, TW = 0.6, TD = 0.8, TH = 0.74;   // (its narrow end to the hall wall)
   bx(TW, 0.028, TD, laminate, tx, TH - 0.014, tz);
   bx(TW + 0.012, 0.03, TD + 0.012, chrome, tx, TH - 0.03, tz);                                     // the chrome edge band
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) { cyl(0.018, 0.018, TH - 0.045, chrome, tx + sx * (TW / 2 - 0.08), (TH - 0.045) / 2, tz + sz * (TD / 2 - 0.08), 8); cyl(0.03, 0.03, 0.012, blackP, tx + sx * (TW / 2 - 0.08), 0.006, tz + sz * (TD / 2 - 0.08), 10); }
   colliders.push({ x0: tx - TW / 2, x1: tx + TW / 2, z0: tz - TD / 2, z1: tz + TD / 2, y1: TH });
   {                                                                                                  // what's on it
     const y = TH;
-    const nap = grp(tx - 0.05, y, tz + 0.05, 0.2); bx(0.12, 0.012, 0.06, chrome, 0, 0.006, 0, nap); for (const s of [-1, 1]) bx(0.12, 0.09, 0.004, chrome, 0, 0.05, s * 0.025, nap); bx(0.11, 0.08, 0.04, white, 0, 0.05, 0, nap);
+    const nap = grp(tx - 0.14, y, tz - 0.28, 0.2); bx(0.12, 0.012, 0.06, chrome, 0, 0.006, 0, nap); for (const s of [-1, 1]) bx(0.12, 0.09, 0.004, chrome, 0, 0.05, s * 0.025, nap); bx(0.11, 0.08, 0.04, white, 0, 0.05, 0, nap);
     const salt = new THREE.CylinderGeometry(0.018, 0.02, 0.07, 10);
-    put(salt, phong(0xf2f2f2, 60), tx + 0.08, y + 0.035, tz + 0.06); put(salt, phong(0x3a3530, 60), tx + 0.12, y + 0.035, tz + 0.03);
-    for (const [dx, c] of [[0.08, 0xc9cdd2], [0.12, 0xc9cdd2]]) cyl(0.018, 0.018, 0.012, chrome, tx + dx, y + 0.076, tz + 0.06 - (dx - 0.08) * 0.75, 10);
-    const box = grp(tx + 0.32, y, tz - 0.08, -0.15);                                                // an empty Tony's box, lid down, a grease spot coming through
+    put(salt, phong(0xf2f2f2, 60), tx + 0.02, y + 0.035, tz - 0.25); put(salt, phong(0x3a3530, 60), tx + 0.06, y + 0.035, tz - 0.28);
+    for (const [dx, c] of [[0.08, 0xc9cdd2], [0.12, 0xc9cdd2]]) cyl(0.018, 0.018, 0.012, chrome, tx + dx - 0.06, y + 0.076, tz - 0.25 - (dx - 0.08) * 0.75, 10);
+    const box = grp(tx, y, tz + 0.16, -0.15);                                                // an empty Tony's box, lid down, a grease spot coming through
     bx(0.4, 0.045, 0.4, lam(0xd8c7a4), 0, 0.0225, 0, box);
     sheet(pic((ctx, W, H) => {
       ctx.fillStyle = "#d8c7a4"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "rgba(120,80,30,0.25)"; ctx.beginPath(); ctx.ellipse(W * 0.7, H * 0.68, 40, 30, 0.4, 0, 7); ctx.fill();
@@ -321,10 +337,10 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     const tvg = sheet(pic((ctx, W, H) => {                                                          // the TV Guide, digest size
       ctx.fillStyle = "#f4f1e8"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#c8102e"; ctx.fillRect(0, 0, W, 46); ctx.fillStyle = "#fff"; ctx.font = "italic 900 34px Arial Black, Arial"; ctx.fillText("TV GUIDE", 10, 36);
       ctx.fillStyle = "#3b6aa0"; ctx.fillRect(10, 56, W - 20, H - 110); ctx.fillStyle = "#222"; ctx.font = "bold 16px Arial"; ctx.fillText("FALL PREVIEW: 22 NEW SHOWS", 10, H - 30);
-    }, 192, 256), 0.14, 0.19, tx - 0.32, y + 0.0065, tz - 0.12); tvg.rotation.x = -Math.PI / 2; tvg.rotation.z = 0.4;   // (flat, turned 0.4 on the table: spun in its own plane before it's laid down)
-    bx(0.14, 0.006, 0.19, lam(0xe8e4d8), tx - 0.32, y + 0.003, tz - 0.12).rotation.y = 0.4;   // its pages
+    }, 192, 256), 0.14, 0.19, tx + 0.17, y + 0.0065, tz - 0.2); tvg.rotation.x = -Math.PI / 2; tvg.rotation.z = 0.4;   // (flat, turned 0.4 on the table: spun in its own plane before it's laid down)
+    bx(0.14, 0.006, 0.19, lam(0xe8e4d8), tx + 0.17, y + 0.003, tz - 0.2).rotation.y = 0.4;   // its pages
     const mug = (x, z, c, par) => { const g = grp(x, y, z, Math.random() * 6); put(new THREE.CylinderGeometry(0.04, 0.036, 0.095, 16, 1, true), Object.assign(phong(c, 50), { side: THREE.DoubleSide }), 0, 0.0475, 0, 0, g); cyl(0.036, 0.036, 0.004, phong(c, 50), 0, 0.002, 0, 16, g); cyl(0.036, 0.036, 0.002, lam(0x3a1f0e), 0, 0.075, 0, 16, g); const h = put(new THREE.TorusGeometry(0.025, 0.007, 6, 12), phong(c, 50), 0.045, 0.05, 0, 0, g); return g; };
-    mug(tx - 0.42, tz + 0.2, 0xf2f2ee);
+    mug(tx - 0.22, tz - 0.1, 0xf2f2ee);
   }
   const chairMat = phong(0xc0501e, 30, 0x333333);
   const shell = (w, d, h, r) => {                                                                   // a molded shell: a rounded slab, bevelled all round
@@ -335,7 +351,7 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
   };
   const seatG = shell(0.42, 0.4, 0.014, 0.07).rotateX(-Math.PI / 2), backG = shell(0.42, 0.3, 0.014, 0.08), legG = new THREE.CylinderGeometry(0.011, 0.011, 0.45, 6);
   const chair = (x, z, ry) => {
-    const g = grp(x, 0, z, ry);
+    const g = grp(x, 0, z, ry); fallTops.push({ x0: x - 0.22, x1: x + 0.22, z0: z - 0.22, z1: z + 0.22, y1: 0.5 });
     put(seatG, chairMat, 0, 0.45, 0, 0, g);
     const b = put(backG, chairMat, 0, 0.7, -0.2, 0, g); b.rotation.x = -0.14;
     for (const sx of [-1, 1]) {
@@ -344,13 +360,11 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
       bx(0.012, 0.012, 0.34, chrome, sx * 0.175, 0.14, 0, g);                                                            // side rails
     }
   };
-  chair(tx - 0.3, tz - TD / 2 - 0.3, 0); chair(tx + 0.3, tz - TD / 2 - 0.25, 0.15);   // hall side, one pushed out a bit
-  chair(tx, tz + TD / 2 + 0.3, Math.PI);                                               // back-wall side
-  chair(tx + TW / 2 + 0.32, tz + 0.05, -Math.PI / 2 + 0.2);                            // end, turned in
+  chair(tx - TW / 2 - 0.3, tz + 0.05, Math.PI / 2); chair(tx + TW / 2 + 0.3, tz + 0.08, -Math.PI / 2 + 0.12);   // across from each other, the door side's back clear of the door swung open (LUNCH_CHAIRS sit where these do)
 
   // ---- kitchenette: oak base cabinets under a laminate counter with the sink sunk in it, uppers above ----
-  const kx0 = x1 - 2.15, kx1 = x1 - 0.72, CD = 0.6, CH = 0.9, kz = z1 - CD / 2, front = z1 - CD;
-  const kw = kx1 - kx0, kc = (kx0 + kx1) / 2, sinkX = kx0 + kw * 0.55, SW = 0.5, SD = 0.38, sz = kz - 0.03;
+  const kx0 = x1 - 2.62, ux0 = x1 - 2.15, kx1 = x1 - 0.72, CD = 0.6, CH = 0.9, kz = z1 - CD / 2, front = z1 - CD;
+  const kw = kx1 - kx0, kc = (kx0 + kx1) / 2, uw = kx1 - ux0, uc = (ux0 + kx1) / 2, sinkX = kx0 + 0.64, SW = 0.5, SD = 0.38, sz = kz - 0.03;
   const door = (x, y, w, h, zf, knob) => {                                                           // a panelled door: the slab, a raised field, a brass knob
     bx(w - 0.008, h - 0.008, 0.018, oak, x, y, zf - 0.009);
     bx(w - 0.1, h - 0.1, 0.008, oakDk, x, y, zf - 0.019); bx(w - 0.12, h - 0.12, 0.006, oak, x, y, zf - 0.024);
@@ -360,14 +374,14 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
   bx(kw, CH - 0.32, CD - 0.01, oakDk, kc, 0.1 + (CH - 0.32) / 2, kz + 0.005);                         // the carcass (low enough to clear the sink's basin)
   for (const x of [kx0 + 0.009, kx1 - 0.009]) bx(0.018, CH - 0.135, CD - 0.01, oakDk, x, 0.1 + (CH - 0.135) / 2 - 0.0, kz + 0.005);   // its end panels
   bx(kw, CH - 0.135 - 0.58, 0.018, oakDk, kc, 0.68 + (CH - 0.135 - 0.58) / 2, front + 0.009);           // the face frame behind the drawers
-  for (let i = 0; i < 3; i++) { const w = kw / 3, x = kx0 + w * (i + 0.5); door(x, 0.1 + (CH - 0.32) / 2, w, CH - 0.32, front, [i % 2 ? -w / 2 + 0.06 : w / 2 - 0.06, (CH - 0.32) / 2 - 0.08]); door(x, CH - 0.04 - 0.08, w, 0.15, front, [0, 0]); }   // doors under, a drawer over each
+  for (let i = 0; i < 4; i++) { const w = kw / 4, x = kx0 + w * (i + 0.5); door(x, 0.1 + (CH - 0.32) / 2, w, CH - 0.32, front, [i % 2 ? -w / 2 + 0.06 : w / 2 - 0.06, (CH - 0.32) / 2 - 0.08]); door(x, CH - 0.04 - 0.08, w, 0.15, front, [0, 0]); }   // doors under, a drawer over each
   // the counter, built round the sink's hole, a rolled front edge
   bx(sinkX - SW / 2 - kx0 + 0.01, 0.035, CD + 0.02, laminate, (kx0 - 0.01 + sinkX - SW / 2) / 2, CH - 0.0175, kz);
   bx(kx1 + 0.01 - sinkX - SW / 2, 0.035, CD + 0.02, laminate, (kx1 + 0.01 + sinkX + SW / 2) / 2, CH - 0.0175, kz);
   bx(SW, 0.035, sz - SD / 2 - (front - 0.01), laminate, sinkX, CH - 0.0175, (front - 0.01 + sz - SD / 2) / 2);
   bx(SW, 0.035, z1 - (sz + SD / 2), laminate, sinkX, CH - 0.0175, (z1 + sz + SD / 2) / 2);
   bx(kw + 0.02, 0.012, 0.012, phong(0xb5ab90, 30), kc, CH - 0.03, front - 0.016);
-  bx(kw, 0.1, 0.012, laminate, kc, CH + 0.05, z1 - 0.006);                                            // the backsplash
+  bx(uw, 0.1, 0.012, laminate, uc, CH + 0.05, z1 - 0.006);                                            // the backsplash
   {                                                                                                    // the sink: a stainless basin under the hole, a drain, twin taps
     const ss = phong(0xb9bec4, 70, 0xdddddd), SDP = 0.17, by = CH - SDP;
     bx(SW - 0.02, 0.006, SD - 0.02, ss, sinkX, by, sz);
@@ -392,19 +406,19 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     bx(0.9, 0.012, 0.6, lam(0x2a2b2d), sinkX, 0.006, front - 0.32);                                  // the rubber mat in front of it
   }
   const UD = 0.33, uy0 = 1.45, uy1 = 2.15;
-  bx(kw, uy1 - uy0, UD - 0.02, oakDk, kc, (uy0 + uy1) / 2, z1 - UD / 2 + 0.01);
-  for (let i = 0; i < 3; i++) { const w = kw / 3; door(kx0 + w * (i + 0.5), (uy0 + uy1) / 2, w, uy1 - uy0, z1 - UD, [i % 2 ? -w / 2 + 0.06 : w / 2 - 0.06, -(uy1 - uy0) / 2 + 0.08]); }
-  bx(kw + 0.03, 0.04, UD + 0.02, oakDk, kc, uy1 + 0.02, z1 - UD / 2);                                 // the crown
+  bx(uw, uy1 - uy0, UD - 0.02, oakDk, uc, (uy0 + uy1) / 2, z1 - UD / 2 + 0.01);
+  for (let i = 0; i < 3; i++) { const w = uw / 3; door(ux0 + w * (i + 0.5), (uy0 + uy1) / 2, w, uy1 - uy0, z1 - UD, [i % 2 ? -w / 2 + 0.06 : w / 2 - 0.06, -(uy1 - uy0) / 2 + 0.08]); }
+  bx(uw + 0.03, 0.04, UD + 0.02, oakDk, uc, uy1 + 0.02, z1 - UD / 2);                                 // the crown
   {                                                                                                    // a paper towel roll under the uppers
-    const ty = uy0 - 0.08, tx2 = kx0 + 0.55;
+    const ty = uy0 - 0.08, tx2 = ux0 + 0.3;
     for (const s of [-1, 1]) bx(0.01, 0.08, 0.04, chrome, tx2 + s * 0.15, uy0 - 0.04, z1 - UD + 0.1);
     cyl(0.055, 0.055, 0.28, white, tx2, ty, z1 - UD + 0.1, 16).rotation.z = Math.PI / 2;
     sheet(lam(0xeeeeea), 0.27, 0.12, tx2, ty - 0.11, z1 - UD + 0.045, Math.PI);
   }
   colliders.push({ x0: kx0, x1: kx1, z0: z1 - CD, z1, y1: CH });
-  // the coffee maker: base and warming plate, the reservoir tower, the brew head over the pot (the pot's on while the store's open)
+  // the coffee maker, between the sink and the microwave: base and warming plate, the reservoir tower, the brew head over the pot (the pot's on while the store's open)
   {
-    const g = grp(kx0 + 0.2, CH, kz + 0.04), bp = blackP;
+    const g = grp(kx0 + 1.04, CH, kz + 0.04), bp = blackP;
     bx(0.2, 0.04, 0.26, bp, 0, 0.02, 0, g); bx(0.2, 0.38, 0.09, bp, 0, 0.19, 0.085, g); bx(0.2, 0.08, 0.24, bp, 0, 0.34, 0.01, g);
     cyl(0.065, 0.065, 0.008, lam(0x2e2e30), 0, 0.044, -0.035, 18, g);
     const pot = put(new THREE.LatheGeometry([[0.001, 0], [0.06, 0.002], [0.074, 0.04], [0.072, 0.1], [0.055, 0.15], [0.05, 0.16]].map(([r, y]) => new THREE.Vector2(r, y)), 20),
@@ -413,8 +427,8 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     cyl(0.052, 0.052, 0.02, bp, 0, 0.215, -0.035, 16, g);
     const hd = put(new THREE.TorusGeometry(0.035, 0.01, 6, 12, Math.PI), bp, 0.075, 0.13, -0.035, Math.PI / 2, g); hd.rotation.z = -Math.PI / 2;
     breakFx.coffeeLed = new THREE.MeshBasicMaterial({ color: 0x401010 }); glow(bx(0.012, 0.012, 0.004, breakFx.coffeeLed, 0.06, 0.02, -0.131, g));
-    for (let k = 0; k < 6; k++) cyl(0.036, 0.028, 0.08, lam(0xfafaf6), kx0 + 0.4, CH + 0.04 + k * 0.022, kz - 0.17, 12);   // a sleeve of styrofoam cups
-    cyl(0.06, 0.06, 0.15, phong(0xb7362c, 50), kx0 + 0.4, CH + 0.075, kz + 0.14, 16); cyl(0.061, 0.061, 0.012, lam(0x222222), kx0 + 0.4, CH + 0.155, kz + 0.14, 16);   // the coffee can
+    for (let k = 0; k < 6; k++) cyl(0.036, 0.028, 0.08, lam(0xfafaf6), kx0 + 1.24, CH + 0.04 + k * 0.022, kz - 0.17, 12);   // a sleeve of styrofoam cups
+    cyl(0.06, 0.06, 0.15, phong(0xb7362c, 50), kx0 + 1.24, CH + 0.075, kz + 0.14, 16); cyl(0.061, 0.061, 0.012, lam(0x222222), kx0 + 1.24, CH + 0.155, kz + 0.14, 16);   // the coffee can
   }
   // the microwave: almond, a dark window with its screen, the keypad, and the clock blinking 12:00 (see breakroomTick)
   {
@@ -465,13 +479,13 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     ctx.font = "22px Arial"; ctx.fillText("wash your own dishes!", W / 2, 128);
   }, 384, 150), 0.3, 0.117, sinkX + 0.02, 1.22, z1 - 0.008, Math.PI);
 
-  // trash can by the counter: open top, a liner turned over the rim (what's in it: see trashBins)
+  // trash can under the office's window: open top, a liner turned over the rim (what's in it: see trashBins)
   {
-    const cx = kx0 - 0.28, cz = z1 - 0.3;
+    const cx = (OFFICE_WIN.x0 + OFFICE_WIN.x1) / 2, cz = z1 - 0.2;                                  // (under the office's window)
     const can = put(new THREE.LatheGeometry([[0.15, 0], [0.17, 0.55], [0.162, 0.55], [0.142, 0.015], [0.001, 0.015]].map(([r, y]) => new THREE.Vector2(r, y)), 28),
       new THREE.MeshPhongMaterial({ color: 0x3b4a5a, specular: 0x333333, shininess: 20, side: THREE.DoubleSide }), cx, 0, cz);
     const liner = put(new THREE.TorusGeometry(0.168, 0.007, 6, 30), new THREE.MeshLambertMaterial({ color: 0xd8dde2 }), cx, 0.55, cz); liner.rotation.x = Math.PI / 2;
-    trashBins.breakroom = { id: "breakroom", name: "break room trash", cap: 10, x: cx, z: cz, rimY: 0.55, r: 0.15, liner: 0xd8dde2, parts: [can, liner], stand: { x: cx, z: cz - 0.62, ry: 0 } };
+    trashBins.breakroom = { id: "breakroom", name: "break room trash", cap: 10, x: cx, z: cz, rimY: 0.55, r: 0.15, liner: 0xd8dde2, parts: [can, liner], stand: { x: cx, z: cz - 0.62, ry: Math.PI } };
     colliders.push({ x0: cx - 0.17, x1: cx + 0.17, z0: cz - 0.17, z1: cz + 0.17, y1: 0.55 });
   }
 
@@ -489,7 +503,7 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
 
   // ---- by the door: the punch clock and its card rack ----
   {
-    const g = grp(BOH_DOORS.breakroom + 1.05, 1.38, z0, Math.PI);                                                             // (facing +z, into the room)
+    const g = grp(x0 + 0.72, 1.38, z0, Math.PI);                                                             // (facing +z, into the room)
     bx(0.26, 0.34, 0.15, phong(0xcfc6ae, 30), 0, 0, -0.075, g); bx(0.27, 0.06, 0.16, phong(0x8a8478, 30), 0, -0.19, -0.08, g);
     sheet(pic((ctx, W) => { ctx.fillStyle = "#cfc6ae"; ctx.fillRect(0, 0, W, W); ctx.fillStyle = "#f4f1e6"; ctx.beginPath(); ctx.arc(W / 2, W / 2, W / 2 - 6, 0, 7); ctx.fill(); ctx.strokeStyle = "#222"; ctx.lineWidth = 6; ctx.stroke();
       ctx.fillStyle = "#222"; ctx.font = "bold 18px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; for (let i = 1; i <= 12; i++) { const a = i * Math.PI / 6; ctx.fillText(i, W / 2 + Math.sin(a) * W * 0.36, W / 2 - Math.cos(a) * W * 0.36); }
@@ -498,25 +512,25 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     breakFx.punch = { g, h: null, m: null };
     const hand = (len, w) => { const p = new THREE.Group(); p.position.set(0, 0.05, -0.162); g.add(p); bx(w, len, 0.002, lam(0x111111), 0, len / 2 - 0.01, 0, p); return p; };
     breakFx.punch.h = hand(0.04, 0.008); breakFx.punch.m = hand(0.06, 0.005);
-    const r = grp(BOH_DOORS.breakroom + 1.53, 1.32, z0, Math.PI);                                                             // the rack: a row of slots, a card for each of us
+    const r = grp(x0 + 1.12, 1.32, z0, Math.PI);                                                             // the rack: a row of slots, a card for each of us
     bx(0.2, 0.5, 0.04, phong(0x9a9488, 30), 0, 0, -0.02, r);
     for (let k = 0; k < 6; k++) { bx(0.19, 0.012, 0.03, phong(0x6a665c, 30), 0, -0.22 + k * 0.08, -0.05, r); if (k !== 1 && k < 5) bx(0.09, 0.18, 0.003, lam(0xe4d6a8), (k % 2 ? 0.035 : -0.035), -0.18 + k * 0.08, -0.04, r); }
   }
-  // the extinguisher and the first aid kit on the east wall, the labor law poster
+  // the extinguisher under the office's window beside the trash (its sign low, under it: the window's over it), the first aid kit and the labor law poster on the east wall
   {
-    const ex = x1 - 0.1, ez = z0 + 0.42;
+    const ex = OFFICE_WIN.x0 + 0.2, ez = z1 - 0.1;
     cyl(0.07, 0.07, 0.42, phong(0xc0161b, 70, 0xffaaaa), ex, 0.55, ez, 16); put(new THREE.SphereGeometry(0.07, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), phong(0xc0161b, 70, 0xffaaaa), ex, 0.76, ez);
-    bx(0.04, 0.08, 0.05, blackP, ex, 0.86, ez); bx(0.1, 0.012, 0.03, blackP, ex - 0.03, 0.89, ez); const hose = put(new THREE.TorusGeometry(0.1, 0.008, 6, 12, Math.PI * 0.8), blackP, ex - 0.065, 0.76, ez, Math.PI / 2);
-    bx(0.03, 0.06, 0.16, chrome, x1 - 0.015, 0.68, ez);                                                    // its hook
-    sheet(pic((ctx, W, H) => { ctx.fillStyle = "#c0161b"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 22px Arial"; ctx.fillText("FIRE", W / 2, 34); ctx.fillText("EXTINGUISHER", W / 2, 62); }, 192, 80), 0.24, 0.1, x1 - 0.008, 1.25, ez, -Math.PI / 2);
-    const fa = grp(x1, 1.5, z0 + 1.0, -Math.PI / 2);
+    bx(0.05, 0.08, 0.04, blackP, ex, 0.86, ez); bx(0.03, 0.012, 0.1, blackP, ex, 0.89, ez - 0.03); const hose = put(new THREE.TorusGeometry(0.1, 0.008, 6, 12, Math.PI * 0.8), blackP, ex, 0.76, ez - 0.065);
+    bx(0.16, 0.06, 0.03, chrome, ex, 0.68, z1 - 0.015);                                                    // its hook
+    sheet(pic((ctx, W, H) => { ctx.fillStyle = "#c0161b"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 22px Arial"; ctx.fillText("FIRE", W / 2, 34); ctx.fillText("EXTINGUISHER", W / 2, 62); }, 192, 80), 0.24, 0.1, ex, 0.21, z1 - 0.008, Math.PI);
+    const fa = grp(x1, 1.5, z0 + 0.85, -Math.PI / 2);
     bx(0.3, 0.22, 0.1, phong(0xf2f2ee, 40), 0, 0, 0.05, fa);
     sheet(pic((ctx, W, H) => { ctx.fillStyle = "#f2f2ee"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#c0161b"; ctx.fillRect(W / 2 - 14, 14, 28, 72); ctx.fillRect(W / 2 - 36, 36, 72, 28); ctx.fillStyle = "#222"; ctx.textAlign = "center"; ctx.font = "bold 16px Arial"; ctx.fillText("FIRST AID", W / 2, H - 14); }, 128, 128), 0.24, 0.2, 0, 0, 0.106, 0, fa);
     sheet(pic((ctx, W, H) => {                                                                            // the poster the law makes you put up, never read
       ctx.fillStyle = "#f6f3e8"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#1f3f7a"; ctx.fillRect(0, 0, W, 64); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 26px Arial"; ctx.fillText("YOUR RIGHTS UNDER THE", W / 2, 28); ctx.fillText("FAIR LABOR STANDARDS ACT", W / 2, 56);
       ctx.fillStyle = "#c22"; ctx.font = "bold 32px Arial"; ctx.fillText("FEDERAL MINIMUM WAGE", W / 2, 112); ctx.font = "bold 64px Arial"; ctx.fillText("$4.25", W / 2, 186); ctx.fillStyle = "#333"; ctx.font = "20px Arial"; ctx.fillText("PER HOUR", W / 2, 214);
       ctx.textAlign = "left"; ctx.font = "15px Arial"; for (let y = 250; y < H - 20; y += 20) ctx.fillText("—— ———— ——— —— ————— ——— ———— —— ———", 24, y);
-    }, 420, 560), 0.42, 0.56, x1 - 0.008, 1.45, z0 + 1.62, -Math.PI / 2);
+    }, 420, 560), 0.42, 0.56, x1 - 0.008, 1.5, z0 + 1.38, -Math.PI / 2);
   }
 
   // ---- the bulletin board on the hall wall: this week's schedule, notices, a Polaroid ----
@@ -537,8 +551,8 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     ctx.fillStyle = "#c79a74"; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-40 + k * 40, -30, 13, 0, 7); ctx.fill(); ctx.fillRect(-52 + k * 40, -16, 24, 36); }
     ctx.fillStyle = "#333"; ctx.font = "italic 20px Arial"; ctx.fillText("grand opening", -62, 80); ctx.restore();
   }, 1152, 560);
-  put(new THREE.PlaneGeometry(1.2, 0.66), new THREE.MeshLambertMaterial({ map: board, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), x0 + 0.8, 1.5, z0 + 0.014);   // (clear of the frame's face, 6 mm proud of the wall)
-  bx(1.26, 0.72, 0.02, oakDk, x0 + 0.8, 1.5, z0 - 0.004);                                                      // frame
+  put(new THREE.PlaneGeometry(1.2, 0.66), new THREE.MeshLambertMaterial({ map: board, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), tx - 0.05, 1.38, z0 + 0.014);   // (clear of the frame's face, 6 mm proud of the wall)
+  bx(1.26, 0.72, 0.02, oakDk, tx - 0.05, 1.38, z0 - 0.004);                                                      // frame
 
   // ---- the wall clock over the table, keeping the shift's time (see breakroomTick), employee of the month beside it ----
   {
@@ -549,7 +563,7 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
       for (let i = 1; i <= 12; i++) { const a = i * Math.PI / 6; ctx.fillText(i, W / 2 + Math.sin(a) * W * 0.37, W / 2 - Math.cos(a) * W * 0.37); }
       for (let i = 0; i < 60; i++) { const a = i * Math.PI / 30; ctx.fillRect(W / 2 + Math.sin(a) * W * 0.45 - 1, W / 2 - Math.cos(a) * W * 0.45 - 1, 2, 2); }
     }, 256, 256);
-    const g = grp(tx, 2.05, z1, Math.PI);
+    const g = grp(x0 + 1.12, 1.92, z0);                                                              // (the hall wall, over the card rack)
     put(new THREE.CircleGeometry(0.16, 32), new THREE.MeshLambertMaterial({ map: clock }), 0, 0, 0.006, 0, g);
     put(new THREE.TorusGeometry(0.163, 0.012, 6, 32), blackP, 0, 0, 0.01, 0, g);
     const hand = (len, w, c, z) => { const p = new THREE.Group(); p.position.z = z; g.add(p); bx(w, len, 0.003, lam(c), 0, len / 2 - 0.02, 0, p); return p; };
@@ -563,14 +577,30 @@ rr.position.set(BOH_DOORS.store, DOOR_H + 0.62, Z - T / 2 - 0.02); rr.rotation.y
     ctx.fillStyle = "#c9a07a"; ctx.beginPath(); ctx.arc(W / 2, 128, 34, 0, 7); ctx.fill(); ctx.fillRect(W / 2 - 46, 168, 92, 48);
     ctx.fillStyle = "#fff"; ctx.font = "bold 20px Arial"; ctx.fillText("DANA", W / 2, 246);
   }, 256, 270);
-  put(new THREE.PlaneGeometry(0.4, 0.42), new THREE.MeshLambertMaterial({ map: eotm, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), x0 + 0.75, 1.45, z1 - 0.02, Math.PI);
-  bx(0.44, 0.46, 0.012, lam(0xc9a64a), x0 + 0.75, 1.45, z1 - 0.006);                                           // its gold-tone frame
+  // ---- awards and recognition, over the bulletin board on the hall wall: employee of the month, the district's plaque and certificate, and by the punch clock, the sign-in clipboard ----
+  const ay = 2.03, ax = BOH_DOORS.breakroom + 0.92;
+  put(new THREE.PlaneGeometry(0.4, 0.42), new THREE.MeshLambertMaterial({ map: eotm, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), ax, ay, z0 + 0.02);
+  bx(0.44, 0.46, 0.012, lam(0xc9a64a), ax, ay, z0 + 0.006);                                                    // its gold-tone frame
+  bx(0.32, 0.4, 0.02, oakDk, ax + 0.48, ay, z0 + 0.01);                                                         // a walnut plaque, its engraved brass plate
+  sheet(pic((ctx, W, H) => {
+    ctx.fillStyle = "#c9a64a"; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = "#6b5218"; ctx.lineWidth = 5; ctx.strokeRect(6, 6, W - 12, H - 12); ctx.fillStyle = "#2a1e08"; ctx.textAlign = "center";
+    ctx.font = "bold 21px Georgia, serif"; ctx.fillText("DISTRICT 7", W / 2, 44); ctx.font = "italic 18px Georgia, serif"; ctx.fillText("Most Rentals", W / 2, 88); ctx.fillText("Per Square Foot", W / 2, 112);
+    ctx.font = "bold 22px Georgia, serif"; ctx.fillText("3RD PLACE", W / 2, 164); ctx.font = "15px Georgia, serif"; ctx.fillText("Runner-up, Friendliest Staff", W / 2, 204);
+  }, 256, 256), 0.25, 0.3, ax + 0.48, ay, z0 + 0.022);
+  bx(0.32, 0.25, 0.012, blackP, ax + 0.91, ay + 0.04, z0 + 0.006);                                              // a framed certificate, hung not quite straight
+  sheet(pic((ctx, W, H) => {
+    ctx.fillStyle = "#f4efdc"; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = "#1f3f7a"; ctx.lineWidth = 7; ctx.strokeRect(10, 10, W - 20, H - 20); ctx.fillStyle = "#1f3f7a"; ctx.textAlign = "center"; ctx.font = "italic bold 26px Georgia, serif"; ctx.fillText("Certificate of Achievement", W / 2, 58);
+    ctx.fillStyle = "#333"; ctx.font = "17px Georgia, serif"; ctx.fillText("presented to the whole crew for", W / 2, 96); ctx.font = "bold 20px Georgia, serif"; ctx.fillText("50,000 TAPES REWOUND", W / 2, 130); ctx.fillStyle = "#b3202a"; ctx.beginPath(); ctx.arc(W - 62, H - 52, 22, 0, 7); ctx.fill();
+  }, 384, 256), 0.29, 0.21, ax + 0.91, ay + 0.04, z0 + 0.014).rotation.z = -0.025;
+  { const cb = grp(x0 + 1.52, 1.34, z0); bx(0.23, 0.32, 0.01, lam(0x7a5a38), 0, 0, 0.005, cb); bx(0.09, 0.03, 0.012, chrome, 0, 0.145, 0.012, cb);   // the clipboard, its sign-in sheet
+    sheet(pic((ctx, W, H) => { ctx.fillStyle = "#f7f4e8"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#222"; ctx.font = "bold 19px Arial"; ctx.textAlign = "center"; ctx.fillText("CASH-OUT LOG", W / 2, 26); ctx.textAlign = "left"; ctx.font = "italic 15px Arial"; for (let i = 0; i < 12; i++) { ctx.fillStyle = "#b9c8df"; ctx.fillRect(10, 46 + i * 20, W - 20, 1); ctx.fillStyle = "#22304f"; if (i < 8) ctx.fillText(["Dana", "Ray", "Nick", "Tina"][i % 4] + "  " + (10 + i) + ":00", 18, 43 + i * 20); } }, 192, 280), 0.2, 0.28, 0, -0.012, 0.012, 0, cb); }
 
   // ---- vinyl cove base round the room (not across the doorway) ----
   {
     const cove = lam(0x4a4a4c), H = 0.1, t = 0.012;
     bx(t, H, z1 - z0, cove, x0 + t / 2, H / 2, (z0 + z1) / 2); bx(t, H, z1 - z0, cove, x1 - t / 2, H / 2, (z0 + z1) / 2);
-    bx(x1 - x0, H, t, cove, (x0 + x1) / 2, H / 2, z1 - t / 2);
+    const o0 = BOH_DOORS.office - OFFICE_DOOR_W / 2 - 0.08, o1 = BOH_DOORS.office + OFFICE_DOOR_W / 2 + 0.08;
+    bx(o0 - x0, H, t, cove, (x0 + o0) / 2, H / 2, z1 - t / 2); bx(x1 - o1, H, t, cove, (o1 + x1) / 2, H / 2, z1 - t / 2);
     const d0 = BOH_DOORS.breakroom - DOOR_W / 2 - 0.08, d1 = BOH_DOORS.breakroom + DOOR_W / 2 + 0.08;
     bx(d0 - x0, H, t, cove, (x0 + d0) / 2, H / 2, z0 + t / 2); bx(x1 - d1, H, t, cove, (d1 + x1) / 2, H / 2, z0 + t / 2);
   }

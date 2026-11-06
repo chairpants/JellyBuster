@@ -6,7 +6,7 @@
   const TX = (LX0 + LX1) / 2;              // -2.87: centerline of lobby & auditorium
   const TW = LX1 - LX0, TX0 = LX0, TX1 = LX1, TZ0 = LZ1, TZ1 = 48.5, TH = TALL.ceil;
   const IN0 = TX0 + WALL_T / 2, IN1 = TX1 - WALL_T / 2;   // the auditorium's side walls' inside faces
-  TVU.uLobbyBox.value.set(LX0 - 0.05, LX1 + 0.05, LZ0, LZ1 + 0.05);
+  TVU.uLobbyBox.value.set(LX0 - 0.05, LX1 + 0.05, LZ0, LZ1);   // (to the wall's center line, where its door hangs: the door's far face is the auditorium's)
   TVU.uThBox.value.set(TX0 - 0.05, TX1 + 0.05, TZ0, TZ1 + 0.05);
 
   // lobby walls, art-deco cinema carpet, and ceiling (not over the stairwell: it's walled in, up to the booth)
@@ -233,7 +233,8 @@
   for (const s of [-1, 1]) box(CW, VY + VH - ST_Y, 0.22, curtainMat, TX + s * (TW / 2 - WALL_T / 2 - CW / 2), (VY + VH + ST_Y) / 2, 47.75);
   box(TW - WALL_T, VH, 0.26, curtainMat, TX, VY + VH / 2, 47.7);
   box(FW, FH, 0.08, mat.dark, TX, FY0 + FH / 2, 47.92);
-  TVU.uThScreenP.value.set(TX, SY, 47.8);
+  TVU.uThScreenP.value.set(TX, SY, 47.8); TVU.uThScreenS.value.set(SW, SH);
+  colliders.push({ x0: TX0, x1: TX1, z0: 47.62, z1: TZ1, y0: ST_Y, y1: TH });   // the screen, its frame and the curtains: up on the stage you stop at their faces (the back wall's own stops you past them)
 
   theaterScreenMesh = glow(new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), mat.dark));
   theaterScreenMesh.position.set(TX, SY, 47.85);
@@ -271,7 +272,7 @@
     }, 128, 256);
     projBeamMat = new THREE.MeshBasicMaterial({
       map: beamTex, color: 0xfff8ee, transparent: true, opacity: 0.01,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true,   // (one pass: three's two, back faces then front, left the front ones with no picture color: white. Added light's the same in any order)
     });
     // sections of the picture ride the beam: aScr is where each vertex sits in
     // the frame (0..1, top-left origin), and the fragment blends the 3x3 zone
@@ -361,7 +362,7 @@
     // stairwell's end, clear of the way up). Its inside face the room's,
     // its outside face (and what's on it) out there's, and something to aim at either side
     const leaf = new THREE.Group(), LW = z1 - z0 - 0.06; leaf.position.set(xo + 0.03, 0, z0 + 0.03); scene.add(leaf);
-    const inner = at(0.025, 2.1, LW, steel, 0.0125, F + 1.06, LW / 2, false, leaf);
+    const inner = at(0.025, 2.125, LW, steel, 0.0125, F + 1.0725, LW / 2, false, leaf);   // (up to its head: no line of daylight over it)
     const bar = at(0.05, 0.04, LW - 0.2, lam(0xb8bcc2), 0.07, F + 1.0, LW / 2, false, leaf);   // the panic bar
     const ends = [0.1, LW - 0.1].map(z => at(0.07, 0.08, 0.08, lam(0x8f9398), 0.06, F + 1.0, z, false, leaf));
     at(0.02, 2.1, LW, lam(0x6b7078), -0.01, F + 1.06, LW / 2, true, leaf);
@@ -656,7 +657,7 @@ for (let x = -9.9; x <= STORE.x - 1; x += 2 * CEIL_TILE.x) for (let z = 3.15; z 
 }
 for (const x of [4.5, 8.1]) troffer(x, hallMid, BOH.h, false);              // down the middle of the hall (its ceiling grid is centered there too)
 for (const x of [(BOH.x0 + 0.1 + BOH.rrX - 0.1) / 2, (BOH.rrX + 0.1 + BOH.splitX - 0.1) / 2]) troffer(x, 32.4, BOH.h, true, 1.3);   // the restrooms: 1.7 m across, a tile slot's too wide
-troffer(8.1, 32.4, BOH.h);     // the break room
+troffer(8.1, 31.05, BOH.h);    // the break room
 panelMats = [...panelBuckets].map(([key, bucket]) => {
   const m = new THREE.MeshBasicMaterial({ color: 0xf8fbff, map: diffuserTex });
   m.userData.zone = key.split(":")[0];
