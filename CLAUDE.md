@@ -28,6 +28,7 @@ Sections inside a file start with a `// ---- name ----` comment; grep for the na
 | Employee counter, returns, back cabinet, entry lane and gates, trash receptacle, snack center (cooler, snack rack; the popcorn machine, built here, stands in the theater's lobby) | `store/lobby.js` |
 | Posters, cover atlases, shelves and the store layout (walls, kids, center, Staff Picks, Classic Horror, standee, candy aisle) | `store/shelves.js` |
 | TV lounge (couch, TV, lamps), the light switches | `store/lounge.js` |
+| Potted plants: the weeping fig by the TV (`buildFig`, from VaultBusterGodot), the theater lobby's dracaena (`buildDracaena`) | `store/plants.js` |
 | The roof and everything on it (two decks: the store's at 4 m and the tall block's at 6.4, the iron stair between them, `roofY`; AC units, dish, sign, lawn chairs, projector, the kick-down ladder out back: `BACK_LADDER`), golf, and at the end of the file how it all works (`roofClimb`, `roofTick`, `cineTick`) | `store/roof.js` |
 | The roof's stamped hardware (`roofKit`: boxes, conduit, supports, drains, blocks; merged by material) | `store/roofkit.js` |
 | Tony's building from outside (brick, awning, glass front), Tony's roof | `tonys/outside.js` |

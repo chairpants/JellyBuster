@@ -675,6 +675,9 @@ function buildFlickerSchedule(duration) {
 }
 function flickerLit(schedule, t) { return schedule.some(([on, off]) => t >= on && t < off); }
 
+// ---- the fig in the corner beside the TV (from VaultBusterGodot: store/plants.js) ----
+buildFig(-2.8, 27.4);
+
 // ---- lights: six switch zones (see LIGHT_ZONES), each with its own flicker warm-up ----
 // lightsOut = "the store's dark": every sales-floor zone off and no daylight
 // to speak of — the TV glow, marquee posters, bloom and lamp pools key off it

@@ -421,6 +421,7 @@ const WALL_KINDS = {
   // the break room: cleanable gloss, a slight orange peel, the ceiling light's highlight sliding over it as you walk. The closet: never painted
   paint: `
     vec3 tint = vec3(1.0); float grain = 0.016, peel = 0.012, gloss = 0.05, tight = 10.0, lvl = max(uZone.x, max(uZone.y, uZone.z)), mud = 0.0;
+    if (P.z > 0.02 && P.z < ${f2(STORE.z)} && P.x > ${f2(WALL_L + 0.02)} && P.x < ${f2(STORE.x - 0.02)}) tint = vec3(0.815, 0.539, 0.107);   // the store's own walls, inside: a warm yellow (VaultBusterGodot's: #e9c25c over the white)
     if (P.z > ${f2(STORE.z)} && P.x > ${f2(BOH.x0)}) {
       if (P.z < ${f2(BOH.hallZ)}) {
         lvl = uBoh.x;
@@ -836,9 +837,10 @@ function tagPlane(lines, w, lineH) {         // stacked bare white text, faint b
 
 // carpet, ceiling tiles
 const carpetTex = makeTexture((ctx, W, H) => {
-  ctx.fillStyle = "#16357a"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#40528d"; ctx.fillRect(0, 0, W, H);   // (VaultBusterGodot's look: a worn blue-grey, confetti flecks in it)
   for (let i = 0; i < 2600; i++) {
-    ctx.fillStyle = Math.random() < 0.12 ? "#ffdd55" : (Math.random() < 0.5 ? "#1d4296" : "#0f2a66");
+    const f = Math.random();
+    ctx.fillStyle = f < 0.04 ? "#cf82ad" : f < 0.08 ? "#7bc4c4" : f < 0.12 ? "#e6d694" : (Math.random() < 0.5 ? "#5065ac" : "#334275");
     ctx.globalAlpha = 0.25 + Math.random() * 0.5;
     ctx.fillRect(Math.random() * W, Math.random() * H, 3, 3);
   }
@@ -879,7 +881,7 @@ const mat = {
   glass: new THREE.MeshLambertMaterial({ color: 0x0a1428, transparent: true, opacity: 0.75 }),
   frame: new THREE.MeshLambertMaterial({ color: 0xf4f4f4 }),
   board: new THREE.MeshLambertMaterial({ color: 0x9aa3ad }),
-  upright: new THREE.MeshLambertMaterial({ color: 0x1c4dbb }),
+  upright: new THREE.MeshLambertMaterial({ color: 0x0f226b }),   // navy
   counter: new THREE.MeshLambertMaterial({ color: BLUE }),
   counterTop: new THREE.MeshLambertMaterial({ color: YELLOW }),
   dark: new THREE.MeshLambertMaterial({ color: 0x14161a }),

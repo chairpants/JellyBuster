@@ -174,7 +174,7 @@ const nowPlaying = { shown: undefined, poster: null, plate: null, ctx: null };
     colliders.push({ x0: TX - TR, x1: TX + TR, z0: TZ - TR, z1: TZ + TR, y1: TH });
   }
 
-  // ---- along the stairwell's wall: a tufted bench to wait on, a palm in a brass pot ----
+  // ---- along the stairwell's wall: a tufted bench to wait on, a dracaena in a brass pot (store/plants.js) ----
   { const BX = XS - 0.3, BZ0 = 31.0, BZ1 = 33.2, BC = (BZ0 + BZ1) / 2, LEN = BZ1 - BZ0, red = lam(0x7d1420);
     const seats = [];
     seats.push(bx(0.5, 0.16, LEN, red, BX, 0.4, BC)); seats.push(bx(0.12, 0.5, LEN, red, BX + 0.2, 0.68, BC));
@@ -182,10 +182,7 @@ const nowPlaying = { shown: undefined, poster: null, plate: null, ctx: null };
     for (let i = 0; i < 7; i++) for (const [y] of [[0.6], [0.78]]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), gold); b.position.set(BX + 0.138, y, BZ0 + 0.2 + i * (LEN - 0.4) / 6); scene.add(b); }
     colliders.push({ x0: BX - 0.25, x1: XS, z0: BZ0, z1: BZ1, y1: 0.95 });
     for (const m of seats) { m.userData.sit = true; m.userData.seatPos = { x: BX - 0.04, y: 0, z: BC, ry: -Math.PI / 2, hipY: 0.5 }; aimables.push(m); }
-    const PZ = 29.95, PX = XS - 0.42; cy(0.2, 0.15, 0.42, gold, PX, 0.21, PZ, 20); cy(0.18, 0.18, 0.02, lam(0x2b1d12), PX, 0.415, PZ, 20); cy(0.022, 0.03, 0.85, lam(0x4d3a22), PX, 0.83, PZ, 8);
-    const leaf = lam(0x24602e, { side: THREE.DoubleSide });
-    for (let i = 0; i < 11; i++) { const a = i * 2.4, tip = 0.6 + (i % 3) * 0.14, g = new THREE.Group(); g.position.set(PX, 1.22 + (i % 3) * 0.05, PZ); g.rotation.y = a; scene.add(g);
-      const blade = new THREE.Mesh(new THREE.PlaneGeometry(tip, 0.13, 6, 1), leaf), pa = blade.geometry.attributes.position; for (let k = 0; k < pa.count; k++) { const u = pa.getX(k) / tip + 0.5; pa.setY(k, pa.getY(k) * (1 - u * 0.75) - u * u * 0.34); pa.setZ(k, pa.getZ(k)); } blade.geometry.computeVertexNormals(); blade.position.x = tip / 2; blade.rotation.x = 1.25; g.add(blade); }
+    const PZ = 29.95, PX = XS - 0.42; cy(0.2, 0.15, 0.42, gold, PX, 0.21, PZ, 20); cy(0.18, 0.18, 0.02, lam(0x2b1d12), PX, 0.415, PZ, 20); buildDracaena(PX, 0.425, PZ);
     colliders.push({ x0: PX - 0.22, x1: PX + 0.22, z0: PZ - 0.22, z1: PZ + 0.22, y1: 1 });
   }
 
