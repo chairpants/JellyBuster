@@ -9,14 +9,14 @@ const officeFx = {
   blinds: [],                                    // each pane's { g, k (0 shut .. 1 open), open, slats }
   sec: { power: true, spot: 0, seq: false, seqT: 0, cams: [], btns: [], next: 0 },
 };
-const SEC_CAMS = [                               // where each camera hangs, what it's aimed at, which rooms it can see
-  { name: "FRONT DOOR", at: [10.55, 3.3, 0.55], look: [-2.5, 0.7, 5.5], rooms: ["store", "out"] },
-  { name: "AISLES", at: [-7.3, 3.3, 9.5], look: [6.5, 0.6, 15.5], rooms: ["store"] },
-  { name: "LOUNGE", at: [10.55, 3.3, 27.5], look: [-2, 0.6, 20], rooms: ["store", "hall"] },
-  { name: "BACK HALL", at: [2.3, 2.5, 28.3], look: [9.2, 0.9, 29.3], rooms: ["hall", "store"] },
-  { name: "REGISTER", at: [-5.45, 3.3, 1.75], look: [-5.45, 1.0, 3.9], rooms: ["store"] },   // over the clerk's shoulder, down on the till
-  { name: "CONCESSIONS", at: [-5.3, 2.4, 31.6], look: [-7.0, 0.95, 30.2], rooms: ["lobby"] },   // down on the theater lobby's register, from the customers' side
-  { name: "THEATER", at: [1.5, 5.68, 36], look: [-3.2, 0.9, 43.5], rooms: ["theater"] },   // the house and the screen, from the back corner
+const SEC_CAMS = [                               // where each camera hangs (a dome in the ceiling, its lens at `at`), what it's aimed at, which rooms it can see
+  { name: "FRONT DOOR", ceil: 3.6, at: [10.55, 3.51, 0.55], look: [-2.5, 0.7, 5.5], rooms: ["store", "out"] },
+  { name: "AISLES", ceil: 3.6, at: [-7.3, 3.51, 9.5], look: [6.5, 0.6, 15.5], rooms: ["store"] },
+  { name: "LOUNGE", ceil: 3.6, at: [10.55, 3.51, 27.5], look: [-2, 0.6, 20], rooms: ["store", "hall"] },
+  { name: "BACK HALL", ceil: 2.7, at: [2.3, 2.61, 28.3], look: [9.2, 0.9, 29.3], rooms: ["hall", "store"] },
+  { name: "REGISTER", ceil: 3.6, at: [-5.45, 3.51, 1.75], look: [-5.45, 1.0, 3.9], rooms: ["store"] },   // over the clerk's shoulder, down on the till
+  { name: "CONCESSIONS", ceil: 2.7, at: [-5.3, 2.61, 31.6], look: [-7.0, 0.95, 30.2], rooms: ["lobby"] },   // down on the theater lobby's register, from the customers' side
+  { name: "THEATER", ceil: 6.0, at: [1.5, 5.91, 36], look: [-3.2, 0.9, 43.5], rooms: ["theater"] },   // the house and the screen, from the back corner
 ];
 const SEC_W = 256, SEC_H = 192;
 {
@@ -301,6 +301,7 @@ const SEC_W = 256, SEC_H = 192;
       const m = feedMat(map, label); glow(put(new THREE.PlaneGeometry(w * 0.82, h * 0.78), m, 0, 0.005, -0.012, Math.PI, g));
       return m;
     };
+    const domeGlass = new THREE.MeshPhongMaterial({ color: 0x1a1a1e, specular: 0x666666, shininess: 60, transparent: true, opacity: 0.85 }), domeBase = lam(0xe8e8e8);
     SEC_CAMS.forEach((cam, i) => {
       const rt = new THREE.WebGLRenderTarget(SEC_W, SEC_H, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
       const camera3 = new THREE.PerspectiveCamera(66, SEC_W / SEC_H, 0.05, 60), lookAt = new THREE.Vector3(...cam.look), from = new THREE.Vector3(...cam.at);
@@ -310,11 +311,12 @@ const SEC_W = 256, SEC_H = 192;
       const lab = new THREE.CanvasTexture(canvas2); lab.minFilter = THREE.LinearFilter; lab.generateMipmaps = false;
       S.cams.push({ ...cam, i, rt, camera: camera3, canvas: canvas2, lab, mins: -1 });
       S.cams[i].mat = i < 4 ? crt(x1 - 0.42, 1.535, SZ - 0.51 + i * 0.34, 0.31, 0.29, 0.3, rt.texture, lab) : crt(x1 - 0.42, 1.875, SZ - 0.34 + (i - 4) * 0.34, 0.31, 0.29, 0.3, rt.texture, lab);
-      // the camera itself, out in the store: a beige box on a wall arm, a red tally light when it's up on the spot monitor
-      const body = grp(cam.at[0], cam.at[1], cam.at[2]); body.lookAt(lookAt);
-      bx(0.09, 0.09, 0.22, phong(0xc6c0ab, 30), 0, 0, 0.03, body); cyl(0.04, 0.045, 0.06, blackP, 0, 0, 0.17, 12, body).rotation.x = Math.PI / 2; bx(0.11, 0.012, 0.25, phong(0xa89f86, 20), 0, 0.058, 0.03, body);
-      S.cams[i].tally = new THREE.MeshBasicMaterial({ color: 0x301010 }); glow(bx(0.012, 0.012, 0.004, S.cams[i].tally, 0.03, 0.03, 0.142, body));
-      bx(0.04, 0.32, 0.04, phong(0x8a8370, 20), from.x, from.y + 0.17, from.z);                       // its drop from the ceiling
+      // the camera itself, out in the store: a smoked dome in the ceiling, a red tally light on its trim ring when it's up on the spot monitor
+      const C = cam.ceil;
+      cyl(0.1, 0.1, 0.03, domeBase, from.x, C - 0.016, from.z, 16);
+      put(new THREE.SphereGeometry(0.08, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), domeGlass, from.x, C - 0.03, from.z);
+      S.cams[i].tally = new THREE.MeshBasicMaterial({ color: 0x301010 });
+      const tx = from.x + Math.sign(lookAt.x - from.x || 1) * 0.088; glow(put(new THREE.SphereGeometry(0.008, 8, 6), S.cams[i].tally, tx, C - 0.034, from.z));
     });
     const spotLab = document.createElement("canvas"); spotLab.width = SEC_W; spotLab.height = SEC_H;
     S.spotLabel = { canvas: spotLab, tex: new THREE.CanvasTexture(spotLab), key: "" }; S.spotLabel.tex.minFilter = THREE.LinearFilter; S.spotLabel.tex.generateMipmaps = false;
