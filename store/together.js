@@ -188,7 +188,7 @@ function tgLinked() {
   T.up = true; T.state = "connected";
   tgLeaveGroup();                               // Jellyfin's part is over
   tgButtons(); tgStatus("Connected. Waiting to hear from them…");
-  T.ctl.send(JSON.stringify({ t: "hi", name: tgMyName(), seed: T.seed, uniform: !CUSTOMER, guest: !!GUEST }));
+  T.ctl.send(JSON.stringify({ t: "hi", name: tgMyName(), seed: T.seed, uniform: !CUSTOMER, guest: !!GUEST, outfit: ME_OUTFIT }));
   if (T.host && T.skyPick >= 0 && T.skyDay === shift.day) T.ctl.send(JSON.stringify({ t: "wheel", i: T.skyPick }));   // (they've missed what's already been picked today)
   // on a timer, not the frame loop: a tab in the background stops drawing, and it still has to say it's there
   T.sender = setInterval(tgSend, TOGETHER.sendEvery);
@@ -221,7 +221,7 @@ function tgOnCtl(data, mine) {
   if (d.t === "vcr") return tgVcrApply(d);
   if (d.t === "world") return tgWorldApply(d);
   if (d.t !== "hi" || T.peer) return;
-  tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest);
+  tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest, d.outfit);
   if (T.host && playing) tgVcrSend();           // (a tape's already going: on theirs too)
   tgWorld.last = {}; tgWorld.touched = {}; tgWorld.fullAt = 0;   // (the host's whole store goes over first thing; the guest's own changes after that)
   if (!T.host) for (const [k, p] of Object.entries(TG_PARTS)) tgWorld.last[k] = p.get();   // (the guest's store as it loaded isn't news: the host's is what counts)
@@ -331,9 +331,9 @@ function tgWorldApply(d) {
 }
 
 // ---- the other player ----
-function tgPeerArrives(name, seed, uniform, guest) {
-  const rnd = seeded(seed), female = !guest && rnd() < 0.5;
-  const c = StoreCustomers.build({ ...StoreCustomers.randomOutfit(rnd, female), hat: null, ...(guest ? GUEST_LOOK : {}),
+function tgPeerArrives(name, seed, uniform, guest, outfit) {   // outfit: what they see when they look down (an older copy of the game didn't send it: made up from the seed, then)
+  const rnd = seeded(seed), female = !guest && rnd() < 0.5, theirs = outfit && typeof outfit === "object" && !Array.isArray(outfit) ? JSON.parse(JSON.stringify(outfit)) : null;
+  const c = StoreCustomers.build({ ...StoreCustomers.randomOutfit(rnd, female), hat: null, ...(guest ? GUEST_LOOK : {}), ...(theirs || {}),
     ...(uniform ? { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, nameTag: name.split(" ")[0].toUpperCase() } : {}) });
   c.glows.forEach(glow); c.setMood("happy");
   const label = tgLabel(name); label.position.y = 2.2 * (c.group.scale.y || 1); c.group.add(label);

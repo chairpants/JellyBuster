@@ -9,8 +9,9 @@ camera.rotation.y = player.yaw;
 // pose and the camera rides its head
 // a guest (playing together): somebody plain, the same on both screens. A grey tee (its print the same grey: none to see), jeans, white sneakers
 const GUEST_LOOK = { female: false, top: "tee", topA: "#8a8f96", topB: "#8a8f96", sleeve: "baggy", longSleeves: false, pants: "khaki", pantsColor: "#3b5b8c", shoes: "#eeeeee", hightop: false, hat: null, height: 1, build: 1 };
-const me = StoreCustomers.build({ ...StoreCustomers.randomOutfit(seeded(1985), false), height: 1, build: 1, hat: null,
-  ...(GUEST ? GUEST_LOOK : CUSTOMER ? {} : { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, pants: "khaki", pantsColor: "#b9a27a", shoes: "#1e1e1e" }) });   // Dana's uniform, no name tag (a customer: your own clothes)
+const ME_OUTFIT = { ...StoreCustomers.randomOutfit(seeded(1985), false), height: 1, build: 1, hat: null,
+  ...(GUEST ? GUEST_LOOK : CUSTOMER ? {} : { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, pants: "khaki", pantsColor: "#b9a27a", shoes: "#1e1e1e" }) };   // Dana's uniform, no name tag (a customer: your own clothes). (Playing together, the other player's sent this: they see you as you see yourself)
+const me = StoreCustomers.build(ME_OUTFIT);
 me.rig.head.visible = false; me.rig.neck.visible = false;
 me.walkLean = false;                        // the eye doesn't tip forward, so neither does the chest: the feet stay in view
 scene.add(me.group);
@@ -395,6 +396,10 @@ function tonyBlocked(x, z) {                     // Tony's walls, and the two do
   if (tonyInsideAt(player.x, player.z)) return !(tonyInsideAt(x, z) || z < -0.3 || z > 14.35);
   return !tonyDoorway(x, z) && !tonyBackWay(x, z) && inTonys(x, z, player.r);
 }
+function exitWayIn(x, z, r) {                     // through an emergency exit's doorway from outside, while it's standing open (someone pushed it from inside)
+  const at = (E, X) => E.leaf && E.a > 0.6 && Math.abs(x - X) < 0.6;
+  return (at(storeExit, STORE.x) && z > STORE_EXIT.z0 + r && z < STORE_EXIT.z1 - r) || (at(fireExit, WALL_L) && z > FIRE_EXIT.z0 + r && z < FIRE_EXIT.z1 - r);
+}
 function outBlocked(x, z) {
   const r = player.r;
   if (tonyFrontLocked(x, z)) return true;
@@ -404,7 +409,7 @@ function outBlocked(x, z) {
   if (z < -120 || z > 150 || x < -120 || x > 120) return true;
   if (tonyDoorway(x, z) || tonyBackWay(x, z)) return false;
   if (inTonys(x, z, r)) return true;
-  if (inBuilding(x, z, r)) return !(CUSTOMER && z < 0.5 && x > 0.05 + r && x < 1.75 - r);   // (the front doors: see blocked)
+  if (inBuilding(x, z, r)) return !(CUSTOMER && z < 0.5 && x > 0.05 + r && x < 1.75 - r) && !exitWayIn(x, z, r);   // (the front doors: see blocked; or an emergency exit standing open)
   for (const { g } of carsOut?.all() || []) {
     if (Math.abs(g.position.x - x) > 3.5 || Math.abs(g.position.z - z) > 3.5) continue;
     const s = g.userData.car, q = g.worldToLocal(carQ.set(x, 0.5, z));
