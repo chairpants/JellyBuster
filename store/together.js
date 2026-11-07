@@ -188,7 +188,7 @@ function tgLinked() {
   T.up = true; T.state = "connected";
   tgLeaveGroup();                               // Jellyfin's part is over
   tgButtons(); tgStatus("Connected. Waiting to hear from them…");
-  T.ctl.send(JSON.stringify({ t: "hi", name: tgMyName(), seed: T.seed, uniform: !CUSTOMER }));
+  T.ctl.send(JSON.stringify({ t: "hi", name: tgMyName(), seed: T.seed, uniform: !CUSTOMER, guest: !!GUEST }));
   if (T.host && T.skyPick >= 0 && T.skyDay === shift.day) T.ctl.send(JSON.stringify({ t: "wheel", i: T.skyPick }));   // (they've missed what's already been picked today)
   // on a timer, not the frame loop: a tab in the background stops drawing, and it still has to say it's there
   T.sender = setInterval(tgSend, TOGETHER.sendEvery);
@@ -200,6 +200,7 @@ function tgSend() {
     T.timeAt = performance.now();
     if (T.skyDay !== shift.day) { T.skyDay = shift.day; T.skyPick = -1; }   // (a picked weather's only for that day)
     T.ctl.send(JSON.stringify({ t: "time", h: shift.h, day: shift.day }));
+    if (playing && T.peer) tgVcrSend(true);      // (where the tape's got to: the other's put right if it's wandered)
   }
   const g = me.group.position, r = v => Math.round(v * 1000) / 1000;
   const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : null;
@@ -216,8 +217,10 @@ function tgOnCtl(data, mine) {
     shift.warp = 0; shift.h = d.h; shift.day = d.day >>> 0;
     return;
   }
+  if (d.t === "vcr") return tgVcrApply(d);
   if (d.t !== "hi" || T.peer) return;
-  tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform);
+  tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest);
+  if (T.host && playing) tgVcrSend();           // (a tape's already going: on theirs too)
   toast(`${T.peer.name} is here`, true);
   tgStatus(`Connected to ${T.peer.name}. Each of you is in your own store, so you'll see each other but nothing else is shared yet.`);
 }
@@ -243,10 +246,44 @@ function togetherSkyPicked(o, fromOtherPlayer) {   // (from the wheel) a pick on
   if (!fromOtherPlayer && T.ctl?.readyState === "open") T.ctl.send(JSON.stringify({ t: "wheel", i }));
 }
 
+// ---- the tape: whatever's in one VCR is in the other's, at the same place, playing or paused ----
+// Either can put a tape in, pause it, wind it or take it out: each change goes over as where the tape is now (which tape,
+// which episode, how far in, paused or not), and the other's VCR is put the same. What that does to the other's own video
+// (it starts, it seeks, it pauses) would come straight back as a change of theirs: for a moment after, those aren't sent.
+// A tape put in from the other side plays from the catalog's copy (nothing's off your shelves), and comes out of the VCR
+// into nobody's hand. The host says where its tape's got to every couple of seconds; more than a second out, it's put right
+const tgVcr = { quiet: 0, theirs: null, want: null };   // want: the newest word from them, and when it came (a tape that's still loading is put to that, not to what started it)
+function tgVcrSend(drift = false) {
+  const T = together; if (T.ctl?.readyState !== "open" || !T.peer || performance.now() < tgVcr.quiet) return;
+  const s = playing ? { t: "vcr", key: tapeKey(titleOfCopy(playing.tape)), ep: playing.idx, at: Math.round((media.on ? media.t : video.currentTime) * 100) / 100, paused: video.paused || media.on, drift }
+    : { t: "vcr", key: null };
+  if (drift && !playing) return;
+  try { T.ctl.send(JSON.stringify(s)); } catch {}
+}
+for (const ev of ["play", "pause", "seeked"]) video.addEventListener(ev, () => { if (!paused && !media.on) tgVcrSend(); });   // (not the pause screen pausing it: that's just you)
+function tgVcrApply(d) {
+  const T = together, quiet = ms => { tgVcr.quiet = Math.max(tgVcr.quiet, performance.now() + ms); };
+  quiet(1500); tgVcr.want = { d, got: performance.now() };
+  if (!d.key) { if (playing) eject(playing.tape !== tgVcr.theirs); tgVcr.theirs = null; return; }   // (yours comes out into your hand; theirs just goes)
+  const t = catalog.find(x => tapeKey(x) === d.key);
+  if (!t) { toast(`${T.peer?.name || "They"} put on a tape this store doesn't have`); return; }
+  const at = (w = tgVcr.want) => w.d.paused ? w.d.at : w.d.at + (performance.now() - w.got) / 1000;   // (how far it'll have got while this one caught up)
+  const line = (w = tgVcr.want) => {
+    if (Math.abs(video.currentTime - at(w)) > (w.d.drift ? 1 : 0.5)) video.currentTime = at(w);
+    if (w.d.paused && !video.paused) video.pause(); else if (!w.d.paused && video.paused) video.play().catch(() => {});
+  };
+  if (playing && tapeKey(titleOfCopy(playing.tape)) === d.key && playing.idx === d.ep) { if (!media.on) line(); return; }
+  if (d.drift) return;                           // (a reminder of where it's got to: no reason to change tapes over)
+  if (playing && playing.tape !== tgVcr.theirs) eject();   // yours comes out into your hand, as when you swap tapes
+  tgVcr.theirs = t; t.tapePos = { ep: d.ep, t: at() };
+  quiet(8000);                                   // (however long the tape takes to load: its starting isn't news)
+  playEpisode(d.ep, t).then(() => { const w = tgVcr.want; if (playing?.tape === t && w.d.key === d.key && w.d.ep === d.ep) line(w); tgVcr.quiet = performance.now() + 800; });
+}
+
 // ---- the other player ----
-function tgPeerArrives(name, seed, uniform) {
-  const rnd = seeded(seed), female = rnd() < 0.5;
-  const c = StoreCustomers.build({ ...StoreCustomers.randomOutfit(rnd, female), hat: null,
+function tgPeerArrives(name, seed, uniform, guest) {
+  const rnd = seeded(seed), female = !guest && rnd() < 0.5;
+  const c = StoreCustomers.build({ ...StoreCustomers.randomOutfit(rnd, female), hat: null, ...(guest ? GUEST_LOOK : {}),
     ...(uniform ? { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, nameTag: name.split(" ")[0].toUpperCase() } : {}) });
   c.glows.forEach(glow); c.setMood("happy");
   const label = tgLabel(name); label.position.y = 2.2 * (c.group.scale.y || 1); c.group.add(label);

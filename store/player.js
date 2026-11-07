@@ -7,8 +7,10 @@ camera.rotation.y = player.yaw;
 // camera is where they'd be. It stands a little behind the eye so looking
 // down shows your chest, belly and feet; on the couch it takes Dana's sitting
 // pose and the camera rides its head
+// a guest (playing together): somebody plain, the same on both screens. A grey tee (its print the same grey: none to see), jeans, white sneakers
+const GUEST_LOOK = { female: false, top: "tee", topA: "#8a8f96", topB: "#8a8f96", sleeve: "baggy", longSleeves: false, pants: "khaki", pantsColor: "#3b5b8c", shoes: "#eeeeee", hightop: false, hat: null, height: 1, build: 1 };
 const me = StoreCustomers.build({ ...StoreCustomers.randomOutfit(seeded(1985), false), height: 1, build: 1, hat: null,
-  ...(CUSTOMER ? {} : { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, pants: "khaki", pantsColor: "#b9a27a", shoes: "#1e1e1e" }) });   // Dana's uniform, no name tag (a customer: your own clothes)
+  ...(GUEST ? GUEST_LOOK : CUSTOMER ? {} : { top: "uniform", topA: "#1b3fa0", topB: "#ffd400", longSleeves: false, pants: "khaki", pantsColor: "#b9a27a", shoes: "#1e1e1e" }) });   // Dana's uniform, no name tag (a customer: your own clothes)
 me.rig.head.visible = false; me.rig.neck.visible = false;
 me.walkLean = false;                        // the eye doesn't tip forward, so neither does the chest: the feet stay in view
 scene.add(me.group);
