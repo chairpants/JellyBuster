@@ -990,7 +990,7 @@ function cmTick(dt) {
   const sn = $("sneak"); sn.style.display = where || cm.heat > 0 ? "block" : "none";
   if (where || cm.heat > 0) { sn.className = seer ? "seen" : ""; sn.firstChild.textContent = seer ? `SEEN · ${seer.first.toUpperCase()}` : `STAFF ONLY · ${(where || "").toUpperCase()}${cmRunning() ? " · THEY CAN HEAR YOU RUN" : ""}`; sn.lastChild.style.setProperty("--h", `${(cm.heat * 100).toFixed(0)}%`); }
   // a door on a closer: one the staff left open swings shut once nobody's in it (unless you unlocked it yourself)
-  for (const k of KEYED) {
+  for (const k of GUEST ? [] : KEYED) {            // (a guest's doors are the host's: they shut when the host's do)
     const d = k.door(); if (!d?.open || d.byYou) { if (d) d.closeT = 0; continue; }
     const [x, , z] = doorAt(d), near = Math.hypot(player.x - x, player.z - z) < 1.6 || staff.some(e => e.c && Math.hypot(e.c.group.position.x - x, e.c.group.position.z - z) < 1.8);
     if (near) d.closeT = 0; else if ((d.closeT = (d.closeT || 0) + dt) > 3) { d.closeT = 0; if (!playerIn(d.shut)) toggleDoor(d); }

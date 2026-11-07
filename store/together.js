@@ -202,6 +202,7 @@ function tgSend() {
     T.ctl.send(JSON.stringify({ t: "time", h: shift.h, day: shift.day }));
     if (playing && T.peer) tgVcrSend(true);      // (where the tape's got to: the other's put right if it's wandered)
   }
+  tgWorldTick();
   const g = me.group.position, r = v => Math.round(v * 1000) / 1000;
   const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : null;
   const pose = fall ? 3 : sit ? 2 : keys.has("KeyC") ? 1 : 0;
@@ -218,9 +219,12 @@ function tgOnCtl(data, mine) {
     return;
   }
   if (d.t === "vcr") return tgVcrApply(d);
+  if (d.t === "world") return tgWorldApply(d);
   if (d.t !== "hi" || T.peer) return;
   tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest);
   if (T.host && playing) tgVcrSend();           // (a tape's already going: on theirs too)
+  tgWorld.last = {}; tgWorld.touched = {}; tgWorld.fullAt = 0;   // (the host's whole store goes over first thing; the guest's own changes after that)
+  if (!T.host) for (const [k, p] of Object.entries(TG_PARTS)) tgWorld.last[k] = p.get();   // (the guest's store as it loaded isn't news: the host's is what counts)
   toast(`${T.peer.name} is here`, true);
   tgStatus(`Connected to ${T.peer.name}. Each of you is in your own store, so you'll see each other but nothing else is shared yet.`);
 }
@@ -278,6 +282,50 @@ function tgVcrApply(d) {
   tgVcr.theirs = t; t.tapePos = { ep: d.ep, t: at() };
   quiet(8000);                                   // (however long the tape takes to load: its starting isn't news)
   playEpisode(d.ep, t).then(() => { const w = tgVcr.want; if (playing?.tape === t && w.d.key === d.key && w.d.ep === d.ep) line(w); tgVcr.quiet = performance.now() + 800; });
+}
+
+// ---- the store's moving parts: doors, lights, lamps, blinds, the counter's flap, the cooler, the stool, the standee ----
+// Each side looks at them a few times a second and sends the parts that have changed since it last said; the other puts its
+// own the same. What's just been put to the other's word counts as already said, so it isn't sent straight back. The host
+// sends the lot every few seconds too (whatever didn't take the first time, someone in a doorway, say, takes then), but
+// not over anything the guest's only just changed. Customers and staff are each side's own: a door one of theirs opens opens on both
+const tgWorld = { last: {}, touched: {}, at: 0, fullAt: 0 };
+const TG_PARTS = {
+  doors: { get: () => doors.map(d => d.push ? null : d.open), set: v => v.forEach((o, i) => { const d = doors[i]; if (d && !d.push && o != null && d.open !== o) tgDoorSet(d, o); }) },
+  lights: { get: () => LIGHT_ZONES.map(z => !!zoneOn[z]), set: v => LIGHT_ZONES.forEach((z, i) => { if (v[i] != null && !!zoneOn[z] !== v[i]) setZone(z, v[i]); }) },
+  lamps: { get: () => lamps.map(l => !!l.userData.on), set: v => v.forEach((on, i) => { if (lamps[i] && !!lamps[i].userData.on !== on) setLamp(lamps[i], on); }) },
+  blinds: { get: () => officeFx.blinds.map(b => !!b.open), set: v => v.forEach((o, i) => { const b = officeFx.blinds[i]; if (b && !!b.open !== o) blindsToggle(b); }) },
+  flap: { get: () => !!flapOpen, set: v => { if (!!flapOpen !== v) toggleFlap(); } },
+  cooler: { get: () => !!coolerOpen, set: v => { coolerOpen = v; } },
+  stool: { get: () => stool.carried || stool.by || onStool ? tgWorld.last.stool : [+stool.x.toFixed(2), +stool.z.toFixed(2)],   // (in someone's hands: where it was)
+    set: v => { if (!v || stool.carried || stool.by || onStool) return; stool.x = v[0]; stool.z = v[1]; stoolFit(stool.x, stool.z, stool.box); stool.g.position.set(stool.x, 0, stool.z); } },
+  cutout: { get: () => cutout.carried ? tgWorld.last.cutout : [+cutout.x.toFixed(2), +cutout.z.toFixed(2), +cutout.ry.toFixed(3)],
+    set: v => { if (!v || cutout.carried) return; [cutout.x, cutout.z, cutout.ry] = v; cutoutFit(cutout.x, cutout.z, cutout.ry, cutout.box); cutout.g?.position.set(cutout.x, 0, cutout.z); cutout.g?.rotation.set(0, cutout.ry, 0); tvBake = bakeTvVis(); } },
+};
+function tgDoorSet(d, open) {                    // as if it were swung here: you step out of its way. A lock (customer mode's) doesn't stop it: it's open over there
+  if (!open && playerIn(d.shut)) return;         // (you're in the doorway: it'll go when the host next says, once you're through)
+  const was = d.locked; d.locked = false; toggleDoor(d); d.locked = was;
+}
+function tgWorldTick() {                         // (from tgSend, so it goes on in a background tab)
+  const T = together, now = performance.now(); if (T.ctl?.readyState !== "open" || !T.peer || now - tgWorld.at < 250) return;
+  tgWorld.at = now;
+  const full = T.host && now - tgWorld.fullAt > 3000, out = {};
+  for (const [k, p] of Object.entries(TG_PARTS)) {
+    const v = p.get(), j = JSON.stringify(v);
+    if (j !== JSON.stringify(tgWorld.last[k])) { tgWorld.last[k] = v; tgWorld.touched[k] = now; out[k] = v; }
+    else if (full && v !== undefined) out[k] = v;
+  }
+  if (full) tgWorld.fullAt = now;
+  if (Object.keys(out).length) try { T.ctl.send(JSON.stringify({ t: "world", s: out, full })); } catch {}
+}
+function tgWorldApply(d) {
+  const now = performance.now();
+  for (const [k, v] of Object.entries(d.s || {})) {
+    const p = TG_PARTS[k]; if (!p) continue;
+    if (d.full && now - (tgWorld.touched[k] || 0) < 1500) continue;   // (changed here a moment ago: what's on its way over is newer)
+    try { p.set(v); } catch (e) { console.warn("Play together: couldn't set", k, e); }
+    tgWorld.last[k] = v;                         // (said: not to be sent back)
+  }
 }
 
 // ---- the other player ----

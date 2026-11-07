@@ -649,7 +649,7 @@ function jumpTick(dt) {                          // up and down, and on at the s
   jump.dip = Math.max(0, jump.dip - dt * 0.55);
   if (!jump.air && !player.airH) return false;
   const under = groundUnder(player.x, player.z);
-  if (!jump.air && player.airH > under + 0.01) { jump.air = true; jump.v = 0; jump.peak = player.airH + floorHeightAt(player.x, player.z); }   // walked off the edge of it
+  if (!jump.air && player.airH > under + 0.01) { jump.air = true; jump.v = 0; jump.peak = player.airH + fallGround(player.x, player.z); }   // walked off the edge of it
   if (!jump.air) { player.airH = under; return false; }
   player.airH += jump.v * dt; jump.v -= JUMP.g * dt;
   jump.peak = Math.max(jump.peak ?? -Infinity, playerFloor());
@@ -670,7 +670,7 @@ function jumpTick(dt) {                          // up and down, and on at the s
   if (hitZ) jump.vz = 0; else player.z += jump.vz * dt;
   const land = groundUnder(player.x, player.z);
   if (jump.v < 0 && player.airH <= land) {
-    const dropped = jump.peak - (land + floorHeightAt(player.x, player.z)); jump.peak = null;
+    const dropped = jump.peak - (land + fallGround(player.x, player.z)); jump.peak = null;   // (from the floor you're on: in the booth, measured from the lobby's under it, every landing was a 3 m drop and you went over)
     if (dropped >= FALL.drop) { player.airH = land; jump.air = false; fallStart(FALL_WHY.drop, 0, 0); return false; }   // (further than knees take)
     jump.dip = Math.min(0.11, -jump.v * 0.035); player.airH = land; jump.air = false; jump.recover = JUMP.recover;   // the knees take it
     ambStep(player.x, player.z, Math.min(1, 0.45 - jump.v * 0.12));

@@ -288,6 +288,7 @@ renderer.setAnimationLoop(() => {
   }
   exteriorTick(dt); weatherTick(dt); walkerTick(dt); decorTick(dt);
   if (!playing) updateScreensaver(dt);
+  if (!playing && !video.paused) video.pause();   // (no tape in, nothing to hear: whatever got the video going after it came out, it stops here)
   if (playing || tvMenu) updateVideoFrame();
   rewinderTick(dt);
   StoreTrees.tick(dt, { date: shiftDate(), h: shift.h, wind: WX.wind || 0, gust: WX.gust || 0, cover: WX.cover, night: 1 - tod.level, grass: WX_GROUND.find(g => g.m === mat.grass) });   // the trees outside: sway, season, leaves
