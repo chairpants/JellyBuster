@@ -82,11 +82,17 @@ async function playEpisode(idx, tape = playing?.tape) {
   $("nowPlaying").textContent = `Loading: ${tape.title}…`;
   try {
     if (!await Jelly.attach(video, itemId, woundTo)) return;   // (another tape went in while this one was being asked for)
-    await video.play();
-
-    miniScreens.forEach(m => m.material = videoMat); // every screen shows the tape
+    // every screen shows the tape once it's in, not once it's rolling: a guest's handed the host's tape as the page loads, before
+    // any click, and the browser won't start a video till there's been one. The host's next word starts it (store/together.js),
+    // but the screens, set only here, were left on a frozen screensaver while the theater (which just follows `playing`) showed it
+    miniScreens.forEach(m => m.material = videoMat);
     tvLight.base = 1;
     $("nowPlaying").textContent = `Now Playing: ${tape.title} — ${code}${name}`;
+    try { await video.play(); }
+    catch (err) {
+      if (err.name === "NotAllowedError" || err.name === "AbortError") return;   // (no click yet, or paused as it started: it's in, just not rolling)
+      throw err;
+    }
     tvOsd(`PLAY ▶ ${code.replace(" · ", "")}`.trim(), 4);
   } catch (err) {
     $("nowPlaying").textContent = `⚠ ${err.message}`;
