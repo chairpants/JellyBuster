@@ -256,18 +256,31 @@ function togetherSkyPicked(o, fromOtherPlayer) {   // (from the wheel) a pick on
 // (it starts, it seeks, it pauses) would come straight back as a change of theirs: for a moment after, those aren't sent.
 // A tape put in from the other side plays from the catalog's copy (nothing's off your shelves), and comes out of the VCR
 // into nobody's hand. The host says where its tape's got to every couple of seconds; more than a second out, it's put right
-const tgVcr = { quiet: 0, theirs: null, want: null };   // want: the newest word from them, and when it came (a tape that's still loading is put to that, not to what started it)
-function tgVcrSend(drift = false) {
-  const T = together; if (T.ctl?.readyState !== "open" || !T.peer || performance.now() < tgVcr.quiet) return;
-  const s = playing ? { t: "vcr", key: tapeKey(titleOfCopy(playing.tape)), ep: playing.idx, at: Math.round((media.on ? media.t : video.currentTime) * 100) / 100, paused: video.paused || media.on, drift }
-    : { t: "vcr", key: null };
-  if (drift && !playing) return;
-  try { T.ctl.send(JSON.stringify(s)); } catch {}
+const tgVcr = { loading: null, theirs: null, want: null, mineAt: -1e9 };   // loading: their tape, still coming in (its starting isn't news). want: their newest word, and when it came. mineAt: when you last put a tape in or took one out
+const tgVcrNow = () => playing ? { key: tapeKey(titleOfCopy(playing.tape)), ep: playing.idx, at: media.on ? media.t : video.currentTime, paused: video.paused || media.on } : { key: null };
+function tgVcrEcho(s) {                          // is this just what they told us, being done? (then it's not ours to send back)
+  const w = tgVcr.want; if (!w) return false;
+  if (!s.key || !w.d.key) return !s.key && !w.d.key;
+  const expect = w.d.paused ? w.d.at : w.d.at + (performance.now() - w.got) / 1000;
+  return s.key === w.d.key && s.ep === w.d.ep && s.paused === !!w.d.paused && Math.abs(s.at - expect) < 1.2;
 }
+function tgVcrSend(drift = false) {
+  const T = together; if (T.ctl?.readyState !== "open" || !T.peer) return;
+  if (tgVcr.loading && playing?.tape === tgVcr.loading) return;   // (their tape still coming in: whatever it does meanwhile is just the loading)
+  const s = tgVcrNow();
+  if (drift ? !playing : tgVcrEcho(s)) return;
+  try { T.ctl.send(JSON.stringify({ t: "vcr", ...s, at: s.key ? Math.round(s.at * 100) / 100 : undefined, drift })); } catch {}
+}
+function tgVcrMine() {                           // (store/tv.js: you put a tape in, or took it out. Said at once, whatever's just come from them; a tape where it went in, rolling)
+  tgVcr.mineAt = performance.now(); tgVcr.loading = null; tgVcr.want = null;
+  const T = together; if (T.ctl?.readyState !== "open" || !T.peer) return;
+  try { T.ctl.send(JSON.stringify(playing ? { t: "vcr", key: tapeKey(titleOfCopy(playing.tape)), ep: playing.idx, at: Math.round((playing.from || 0) * 100) / 100, paused: false } : { t: "vcr", key: null })); } catch {}
+}   // (store/tv.js: you put a tape in, or took it out. Said at once, whatever's just come from them)
 for (const ev of ["play", "pause", "seeked"]) video.addEventListener(ev, () => { if (!paused && !media.on) tgVcrSend(); });   // (not the pause screen pausing it: that's just you)
 function tgVcrApply(d) {
-  const T = together, quiet = ms => { tgVcr.quiet = Math.max(tgVcr.quiet, performance.now() + ms); };
-  quiet(1500); tgVcr.want = { d, got: performance.now() };
+  const T = together;
+  if (d.drift && d.key && playing && tapeKey(titleOfCopy(playing.tape)) !== d.key && performance.now() - tgVcr.mineAt < 6000) return;   // (the host's reminder, crossing your own new tape on its way: yours is news to them)
+  tgVcr.want = { d, got: performance.now() };
   if (!d.key) { if (playing) eject(playing.tape !== tgVcr.theirs); tgVcr.theirs = null; return; }   // (yours comes out into your hand; theirs just goes)
   const t = catalog.find(x => tapeKey(x) === d.key);
   if (!t) { toast(`${T.peer?.name || "They"} put on a tape this store doesn't have`); return; }
@@ -276,12 +289,14 @@ function tgVcrApply(d) {
     if (Math.abs(video.currentTime - at(w)) > (w.d.drift ? 1 : 0.5)) video.currentTime = at(w);
     if (w.d.paused && !video.paused) video.pause(); else if (!w.d.paused && video.paused) video.play().catch(() => {});
   };
-  if (playing && tapeKey(titleOfCopy(playing.tape)) === d.key && playing.idx === d.ep) { if (!media.on) line(); return; }
-  if (d.drift) return;                           // (a reminder of where it's got to: no reason to change tapes over)
+  if (playing && tapeKey(titleOfCopy(playing.tape)) === d.key && playing.idx === d.ep) { if (!media.on && tgVcr.loading !== playing.tape) line(); return; }
   if (playing && playing.tape !== tgVcr.theirs) eject();   // yours comes out into your hand, as when you swap tapes
-  tgVcr.theirs = t; t.tapePos = { ep: d.ep, t: at() };
-  quiet(8000);                                   // (however long the tape takes to load: its starting isn't news)
-  playEpisode(d.ep, t).then(() => { const w = tgVcr.want; if (playing?.tape === t && w.d.key === d.key && w.d.ep === d.ep) line(w); tgVcr.quiet = performance.now() + 800; });
+  tgVcr.theirs = t; t.tapePos = { ep: d.ep, t: at() }; tgVcr.loading = t;
+  playEpisode(d.ep, t).then(() => {
+    if (tgVcr.loading !== t) return;             // (something else went in meanwhile)
+    const w = tgVcr.want; if (playing?.tape === t && w?.d.key === d.key && w.d.ep === d.ep) line(w);
+    setTimeout(() => { if (tgVcr.loading === t) tgVcr.loading = null; }, 800);
+  });
 }
 
 // ---- the store's moving parts: doors, lights, lamps, blinds, the counter's flap, the cooler, the stool, the standee ----
