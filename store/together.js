@@ -46,7 +46,8 @@ function tgPack(sdp, head) {                    // -> the ICE username and passw
   const [algo, print] = field("fingerprint").split(" ");
   if (algo.toLowerCase() !== "sha-256") throw new Error("This browser's connection details aren't a kind this can send.");
   const found = [...new Set(sdp.split(/\r?\n/).filter(l => l.startsWith("a=candidate")).map(l => l.split(" "))
-    .filter(p => p[2].toLowerCase() === "udp" && p[7] === "host").map(p => `${tgHostOut(p[4])}|${p[5]}`))];
+    .filter(p => p[2].toLowerCase() === "udp" && p[7] === "host" && p[5] !== "9").map(p => `${tgHostOut(p[4])}|${p[5]}`))]
+    .sort((a, b) => /^\d+\.\d+\.\d+\.\d+\|/.test(b) - /^\d+\.\d+\.\d+\.\d+\|/.test(a));   // (a plain IPv4 address first: the likeliest to reach, and the shortest)
   if (!found.length) throw new Error("The browser found no network address to offer. Is this device on the network?");
   const base = `${field("ice-ufrag")} ${field("ice-pwd")} ${tgToB64(print.replace(/:/g, ""))}`, kept = [];
   for (const c of found) if (`${head} ${base} ${[...kept, c].join(",")}`.length <= TOGETHER.nameMax) kept.push(c);
@@ -73,6 +74,17 @@ function tgParseName(name) {                    // a group's name -> { kind: "o"
 const tgId = () => [...crypto.getRandomValues(new Uint8Array(4))].map(b => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
 
 // ---- the link ----
+// A browser hides its address in what it offers (a made-up name.local, for the other side to look up on the network), and on
+// plenty of networks that lookup never comes back: the two never find each other. A page allowed the microphone is trusted
+// with the real address, so the microphone's asked for (and let go straight away, nothing recorded) before anything's offered.
+// Turned down, or no microphone: it goes ahead with the made-up name, and may still work
+async function tgRevealAddress(say) {
+  if (!navigator.mediaDevices?.getUserMedia) return false;
+  try { if ((await navigator.permissions?.query({ name: "microphone" }))?.state === "granted") return true; } catch {}
+  say("Your browser will ask to use the microphone. Allow it: that's what lets it tell the other device where this one is. Nothing's recorded, and it's switched straight off.");
+  try { (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach(t => t.stop()); return true; }
+  catch { return false; }
+}
 function tgNewPeer() {
   const T = together, mine = T.try;
   if (!window.RTCPeerConnection) throw new Error("This browser doesn't have WebRTC.");
@@ -134,6 +146,8 @@ async function togetherHost() {
   const T = together, mine = ++T.try, id = tgId();
   T.state = "hosting"; T.host = true; tgButtons(); tgStatus("Getting ready…");
   try {
+    await tgRevealAddress(t => tgStatus(t)); if (mine !== T.try) return;
+    tgStatus("Getting ready…");
     const pc = tgNewPeer();
     await pc.setLocalDescription(await pc.createOffer());
     await tgGathered(pc);
@@ -158,6 +172,7 @@ async function togetherJoin(offer, who) {
   const T = together, mine = ++T.try;
   T.state = "joining"; tgButtons(); tgStatus(`Connecting to ${who}…`);
   try {
+    await tgRevealAddress(t => GUEST ? toast(t, true) : tgStatus(t)); if (mine !== T.try) return;
     const pc = tgNewPeer();
     await pc.setRemoteDescription({ type: "offer", sdp: tgUnpack(offer.text, "offer") });
     await pc.setLocalDescription(await pc.createAnswer());
