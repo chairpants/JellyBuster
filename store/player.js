@@ -608,16 +608,19 @@ function fallTick(dt) {
     if (F.t >= FALL.lie && ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].some(k => keys.has(k))) {
       F.stage = "up"; F.t = 0; F.a1 = F.a; F.from = { x: F.fX, z: F.fZ, y: F.fY };
       const L = FALL.long * Math.sin(F.a), spots = [0, FALL.hip, 0.3, 1.0, L].map(d => [F.fX + F.ux * d, F.fZ + F.uz * d]).concat([[F.start.x, F.start.z]]);   // up where your feet are, or wherever along you there's room to stand
-      F.to = spots.map(([x, z]) => { const top = fallSurface(x, z), air = top === Infinity ? 0 : Math.max(0, top - floorHeightAt(x, z)); player.airH = air; const ok = top !== Infinity && !blocked(x, z); player.airH = 0; return ok ? { x, z, air } : null; }).find(Boolean) || { x: F.start.x, z: F.start.z, air: 0 };
+      F.to = spots.map(([x, z]) => { const top = fallSurface(x, z), air = top === Infinity ? 0 : Math.max(0, top - fallGround(x, z)); player.airH = air; const ok = top !== Infinity && !blocked(x, z); player.airH = 0; return ok ? { x, z, air } : null; }).find(Boolean) || { x: F.start.x, z: F.start.z, air: 0 };
     }
     return;
   }
   const T = FALL.up * (F.drunk ? 1.7 : 1), k = s(Math.min(1, F.t / T));
   if (F.prone) player.pitch += (0 - player.pitch) * Math.min(1, dt * 3);
-  F.a = F.a1 * (1 - k); F.fX = F.from.x + (F.to.x - F.from.x) * k; F.fZ = F.from.z + (F.to.z - F.from.z) * k; F.fY = F.from.y + (F.to.air + floorHeightAt(F.to.x, F.to.z) - F.from.y) * k;
+  F.a = F.a1 * (1 - k); F.fX = F.from.x + (F.to.x - F.from.x) * k; F.fZ = F.from.z + (F.to.z - F.from.z) * k; F.fY = F.from.y + (F.to.air + fallGround(F.to.x, F.to.z) - F.from.y) * k;
   fallPose(F);
   if (F.t >= T) { player.x = F.to.x; player.z = F.to.z; player.airH = F.to.air; fall = null; jump.recover = 0.25; me.setBend(); }
 }
+// the floor you'd stand on here, up where you are: the booth's (it's over the lobby's) or the roof's, not the ground's under them. Taken from
+// the ground, getting up in the booth stood you 3 m up on nothing, and you fell again from near the ceiling
+const fallGround = (x, z) => player.onRoof ? roofY(x, z) : player.inBooth ? TALL.booth : floorHeightAt(x, z);
 function fallEye() {                              // (main loop) how high your eye is, while you're down: above the floor you're over
   const F = fall, c = Math.cos(F.a), n = Math.sin(F.a);
   return F.fY + 1.65 * c + 0.3 * n * n - playerFloor();
