@@ -525,9 +525,12 @@ function fireExitUse(side, E = fireExit) {       // E on an emergency exit: from
   if (side !== "in") { toast("No handle this side: it only opens from inside"); return; }
   if (!E.open) { E.open = true; E.t = 0; window.StoreAmbience?.door("push", "open", E.leaf.position.x, 0, E.leaf.position.z); }
 }
-function fireExitTick(dt) {
-  if (fireExit.leaf) { const { z0, z1 } = FIRE_EXIT; exitDoorTick(fireExit, dt, Math.abs(player.z - (z0 + z1) / 2) < 1.4 && player.x < WALL_L + 1.2 && player.x > FIRE_EXIT.well.x0 - 0.5 && !player.onRoof); }
-  if (storeExit.leaf) { const { z0, z1 } = STORE_EXIT; exitDoorTick(storeExit, dt, Math.abs(player.z - (z0 + z1) / 2) < 1.4 && Math.abs(player.x - STORE.x) < 1.3 && !player.onRoof); }
+function fireExitTick(dt) {                      // (near: you, or the other player playing together: its closer waits for either)
+  const peer = together.peer?.c?.group.visible ? together.peer.c.group.position : null;
+  const nearFire = (x, z) => { const { z0, z1 } = FIRE_EXIT; return Math.abs(z - (z0 + z1) / 2) < 1.4 && x < WALL_L + 1.2 && x > FIRE_EXIT.well.x0 - 0.5; };
+  const nearStore = (x, z) => { const { z0, z1 } = STORE_EXIT; return Math.abs(z - (z0 + z1) / 2) < 1.4 && Math.abs(x - STORE.x) < 1.3; };
+  if (fireExit.leaf) exitDoorTick(fireExit, dt, (nearFire(player.x, player.z) && !player.onRoof) || (!!peer && nearFire(peer.x, peer.z)));
+  if (storeExit.leaf) exitDoorTick(storeExit, dt, (nearStore(player.x, player.z) && !player.onRoof) || (!!peer && nearStore(peer.x, peer.z)));
 }
 function exitDoorTick(E, dt, near) {              // the door: out of your way while it's open; its closer pulls it shut once you're clear of it
   if (E.open && !near && (E.t += dt) > 1.5) E.open = false;

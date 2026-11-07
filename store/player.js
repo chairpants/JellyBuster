@@ -773,6 +773,7 @@ function pushDoorTick(d, dt) {
   const bodies = [[player.x, player.z]];
   for (const k of custs) if (k.c) bodies.push([k.c.group.position.x, k.c.group.position.z]);
   for (const e of staff) if (e.c) bodies.push([e.c.group.position.x, e.c.group.position.z]);
+  if (together.peer?.c?.group.visible) bodies.push([together.peer.c.group.position.x, together.peer.c.group.position.z]);   // (the other player, playing together)
   let near = null;                              // across-the-wall offset of whoever's closest to the threshold
   for (const [x, z] of bodies) {
     const along = (d.alongX ? x : z) - d.c, across = (d.alongX ? z : x) - d.at;

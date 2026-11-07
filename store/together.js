@@ -297,6 +297,8 @@ const TG_PARTS = {
   blinds: { get: () => officeFx.blinds.map(b => !!b.open), set: v => v.forEach((o, i) => { const b = officeFx.blinds[i]; if (b && !!b.open !== o) blindsToggle(b); }) },
   flap: { get: () => !!flapOpen, set: v => { if (!!flapOpen !== v) toggleFlap(); } },
   cooler: { get: () => !!coolerOpen, set: v => { coolerOpen = v; } },
+  exits: { get: () => [!!fireExit.open, !!storeExit.open],   // the emergency exits: a push on the bar is shared; each side's closer shuts it once neither of you is near
+    set: v => v.forEach((o, i) => { const E = [fireExit, storeExit][i]; if (o && E.leaf && !E.open) fireExitUse("in", E); }) },
   stool: { get: () => stool.carried || stool.by || onStool ? tgWorld.last.stool : [+stool.x.toFixed(2), +stool.z.toFixed(2)],   // (in someone's hands: where it was)
     set: v => { if (!v || stool.carried || stool.by || onStool) return; stool.x = v[0]; stool.z = v[1]; stoolFit(stool.x, stool.z, stool.box); stool.g.position.set(stool.x, 0, stool.z); } },
   cutout: { get: () => cutout.carried ? tgWorld.last.cutout : [+cutout.x.toFixed(2), +cutout.z.toFixed(2), +cutout.ry.toFixed(3)],
