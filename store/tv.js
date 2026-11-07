@@ -71,7 +71,7 @@ async function playEpisode(idx, tape = playing?.tape) {
   const eps = tape.seasons[0].episodes;
   idx = Math.max(0, Math.min(eps.length - 1, idx));
   const woundTo = tape.tapePos?.ep === idx ? tape.tapePos.t : 0;   // it plays from wherever it's wound to
-  playing = { tape, idx, eps };
+  playing = { tape, idx, eps, from: woundTo };   // (from: where it went in at. Playing together, that's what's said, before the video's caught up)
   tape.tapePos = { ep: idx, t: 0 };          // the tape winds forward as it plays (see the main loop)
   inspecting = false;                        // into the TV — box drops to your side
   const [itemId, epTitle] = eps[idx];
@@ -343,8 +343,9 @@ function vcrUse() {                          // E on the TV or a VCR (the store'
     if (old) {                             // swap: the tape that was in the VCR comes out into your inventory
       if (invMakeRoom()) showTape(old); else { returnBin.push(old); refreshReturnsBin(); }   // (9 items already: Returns)
     }
+    tgVcrMine();                           // (playing together: on theirs too)
   }
-  else if (playing) eject(playing.tape !== tgVcr.theirs);
+  else if (playing) { eject(playing.tape !== tgVcr.theirs); tgVcrMine(); }
 }
 // TV light colors: every 150ms the screen canvas (already cropped,
 // letterboxed and filtered — exactly what's on the glass) is shrunk to 24x24
