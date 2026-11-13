@@ -73,6 +73,25 @@ const SERVICE_ROAD = (() => {
     trees: [[-19.6, 8.5, 3.7], [-21, 26.5, 4.3], [-19.9, 41, 3.6, true], [-6.5, 56.4, 4.2], [8.4, 55.6, 3.6, true], [19.6, 50, 4], [25.2, 46.4, 3.4, true], [30.8, 11.5, 3.5, true], [31.4, 28, 4.3], [30, 40.6, 3.7]],   // the big trees past it: x, z, size, pine
     fx: { snow: { value: 0 }, pond: { value: 0 } } };   // (the road's shader: what's lying on it; see weatherTick)
 })();
+// the edges of the world out front: what you can walk on this side of the fence. The lot and its walk between the county's road yard (chain-link, west)
+// and the woods (east); the road and both its verges, which run on out of sight (roadW / roadE: where you can't follow them any further, nothing there
+// but more road); and the park across it, a clearing in the trees. Everything past these lines is brush, fence or forest: see exterior/edges.js, trees.js
+const EDGE = (() => {
+  const W = -30, E = 33.3, roadW = -46, roadE = 50, front = -12.9, far = -22.1, park = { x0: -20, x1: 26, z0: -40, trees: [[-15.5, -26.5, 3.6], [22.5, -37, 4.1], [-13, -37.6, 3.4, true], [23.8, -24.4, 3.2]] };   // (its big shade trees: x, z, size, pine)
+  const inside = (x, z) => z >= front ? x > W && x < E : z >= far ? x > roadW && x < roadE : z > park.z0 && x > park.x0 && x < park.x1;
+  const SEE = 175;                                 // how far along the road the woods are kept up (past the walls, as far as you can see)
+  // the woods: where they're planted thick ([x0, x1, z0, z1, spacing]), and the brush along their edge ([ax, az, bx, bz]: thickening away from the open side)
+  const woods = [[-115, park.x0 - 1.6, -36, far - 1.2, 2.5], [park.x1 + 1.6, 115, -36, far - 1.2, 2.5], [-SEE, -115, -29, far - 1.2, 2.7], [115, SEE, -29, far - 1.2, 2.7],
+    [park.x0 - 16, park.x1 + 16, -52, park.z0 - 1.4, 2.5], [park.x0 - 16, park.x0 - 1.6, park.z0 - 1.4, -36, 2.5], [park.x1 + 1.6, park.x1 + 16, park.z0 - 1.4, -36, 2.5],
+    [E + 1.3, 115, front + 0.9, -1.2, 2.5], [115, SEE, front + 0.9, -6, 2.7], [-115, -59.5, front + 0.9, -1.2, 2.5], [-SEE, -115, front + 0.9, -6, 2.7]];
+  const brush = [[-SEE, far - 0.6, park.x0 - 0.6, far - 0.6], [park.x0 - 0.6, far - 0.6, park.x0 - 0.6, park.z0 - 0.6], [park.x0 - 0.6, park.z0 - 0.6, park.x1 + 0.6, park.z0 - 0.6],
+    [park.x1 + 0.6, park.z0 - 0.6, park.x1 + 0.6, far - 0.6], [park.x1 + 0.6, far - 0.6, SEE, far - 0.6],
+    [SEE, front + 0.35, E + 0.6, front + 0.35], [E + 0.6, front + 0.35, E + 0.6, 0.2], [-58.6, front + 0.35, -SEE, front + 0.35]];
+  const open = [[park.x0 - 1.5, park.x1 + 1.5, park.z0 - 1.3, far], [-59.4, W + 0.2, front - 0.3, 0.3]];   // kept clear of trees: the park, the county's yard
+  const open2 = (x, z) => z >= front ? x > W && x < E : z >= far || (z > park.z0 && x > park.x0 && x < park.x1);   // open ground, the road and its verges all the way along (past where you can walk them)
+  return { W, E, roadW, roadE, front, far, park, SEE, woods, brush, open, inside, open2,
+    off: (x, z) => z <= SERVICE_ROAD.FRONT && !inside(x, z) };   // (behind the walk it's the service road's fence: SERVICE_ROAD.behindFence)
+})();
 const CURB_H = -LOT_Y_ + 0.008, CURB_Y = (LOT_Y_ + 0.008) / 2;   // a curb: from the paving up to 8 mm proud of the walk and grass (flush, its top fought theirs)
 // where it's paved for driving (the lot, the driveways, the road): 12 cm down, a curb's height under the walk and the grass
 function pavedAt(x, z) {

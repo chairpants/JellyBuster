@@ -30,7 +30,7 @@ function saveState() {
     : e.kind === "snack" ? { kind: "snack", i: units.indexOf(e.ref), left: i === invSel ? snackLeft : e.left, total: i === invSel ? snackTotal : e.total }
     : e.kind === "item" ? { kind: "item", id: e.ref.id } : { kind: "popcorn", pop: e.ref };
   const data = {
-    v: SAVE_V, mode: MODE, redNights: redNights || undefined, role: CUSTOMER ? "customer" : MODE === "customer" ? "staff" : undefined, cm: CUSTOMER ? cmSave() : undefined, log: logData.slice(-60), player: { x: onStool ? stoodAt.x : player.onRoof ? ROOF_DOWN.x : player.inBooth ? (SHAFT.x0 + SHAFT.split) / 2 : player.x, z: onStool ? stoodAt.z : player.onRoof ? ROOF_DOWN.z : player.inBooth ? (TALL.z0 + SHAFT.top) / 2 : player.z, yaw: player.yaw, pitch: player.pitch },   // off the stool: its spot is inside a collider
+    v: SAVE_V, mode: MODE, redNights: redNights || undefined, role: CUSTOMER ? "customer" : MODE === "customer" ? "staff" : undefined, cm: CUSTOMER ? cmSave() : undefined, log: logData.slice(-60), player: parkBusy() ? { x: PLAYGROUND.rocket[0], z: PLAYGROUND.rocket[1] + 2.2, yaw: player.yaw, pitch: 0 } : { x: onStool ? stoodAt.x : player.onRoof ? ROOF_DOWN.x : player.inBooth ? (SHAFT.x0 + SHAFT.split) / 2 : player.x, z: onStool ? stoodAt.z : player.onRoof ? ROOF_DOWN.z : player.inBooth ? (TALL.z0 + SHAFT.top) / 2 : player.z, yaw: player.yaw, pitch: player.pitch },   // off the stool: its spot is inside a collider
     phone: { next: phone.next }, postits: postits.map(n => ({ m: n.m.num, result: n.result, at: n.at, rz: +n.rz.toFixed(3) })), holds: holds.map(h => ({ member: h.member.num, title: copyKey(h.title), at: h.at, day: h.day, copy: h.copy && copyKey(h.copy), by: h.by, alert: h.alert })),
     staff: staff.map(e => ({ id: e.id, first: e.first, last: e.last, female: e.female, outfit: e.outfit, skills: e.skills, jobs: e.jobs.map(j => ({ id: j.id, pri: j.pri })), sched: e.sched })),
     you: { skills: you.skills }, rep: rep.v, upg, drunk: { gut: +drunk.gut.toFixed(3), blood: +drunk.blood.toFixed(3), hang: drunk.hang, owe: drunk.owe },
@@ -379,6 +379,7 @@ renderer.setAnimationLoop(() => {
     d.rattle = Math.max(0, d.rattle - dt);
     d.pivot.rotation.y = d.base + d.a + (d.rattle ? 0.012 * Math.sin(d.rattle * 70) : 0);
   }
+  parkTick(dt);                              // (the seesaw under your feet first: see exterior/playground.js)
   move(dt); moveTick(); bathTick(dt); breakroomTick(dt); officeTick(dt);
   if (!player.onRoof && inv.some(e => e.kind === "tape" && !e.ref.desens) && Math.abs(player.x) < 2 && (gateLastZ - GATE_Z) * (player.z - GATE_Z) < 0) startGateAlarm();   // carried a tape through the gates
   gateLastZ = player.z;
@@ -390,6 +391,7 @@ renderer.setAnimationLoop(() => {
   roofTick(dt); golfTick(dt);
   meTick(dt); bagTick(dt);
   if (roof.climb) camera.position.copy(roof.cam);
+  else if (PARK.climb || PARK.ride) camera.position.copy(PARK.cam);
   else if (golf.on) camera.position.copy(golf.cam);
   else if (onStool) camera.position.copy(me.rig.head.getWorldPosition(meEye)).add(meEye.set(-Math.sin(stool.angle) * 0.06, 0.03, -Math.cos(stool.angle) * 0.06));   // over the collar, a touch forward of it
   else if (ladder.on) {                          // up the steps: the eye where it always is, 21 cm ahead of your body (toward the ladder)
@@ -408,7 +410,7 @@ renderer.setAnimationLoop(() => {
     camera.updateProjectionMatrix();
   }
   const dk = dizzyTick(dt);
-  camera.rotation.y = player.yaw; camera.rotation.x = player.pitch + dk * 0.04 * Math.sin(dizzy.t * 2.1);
+  camera.rotation.y = player.yaw; camera.rotation.x = player.pitch + PARK.tilt + dk * 0.04 * Math.sin(dizzy.t * 2.1);
   camera.rotation.z = dk * 0.09 * Math.sin(dizzy.t * 1.3) + (fall ? fall.roll * 0.3 * fall.tilt : 0);   // the world tipping side to side; down, your head on one side
   invSync();
   cutoutCarryTick();

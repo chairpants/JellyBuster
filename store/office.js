@@ -10,13 +10,17 @@ const officeFx = {
   sec: { power: true, spot: 0, seq: false, seqT: 0, cams: [], btns: [], next: 0 },
 };
 const SEC_CAMS = [                               // where each camera hangs (a dome in the ceiling, its lens at `at`), what it's aimed at, which rooms it can see
-  { name: "FRONT DOOR", ceil: 3.6, at: [10.55, 3.51, 0.55], look: [-2.5, 0.7, 5.5], rooms: ["store", "out"] },
-  { name: "AISLES", ceil: 3.6, at: [-7.3, 3.51, 9.5], look: [6.5, 0.6, 15.5], rooms: ["store"] },
-  { name: "LOUNGE", ceil: 3.6, at: [10.55, 3.51, 27.5], look: [-2, 0.6, 20], rooms: ["store", "hall"] },
-  { name: "BACK HALL", ceil: 2.7, at: [2.3, 2.61, 28.3], look: [9.2, 0.9, 29.3], rooms: ["hall", "store"] },
-  { name: "REGISTER", ceil: 3.6, at: [-5.45, 3.51, 1.75], look: [-5.45, 1.0, 3.9], rooms: ["store"] },   // over the clerk's shoulder, down on the till
-  { name: "CONCESSIONS", ceil: 2.7, at: [-5.3, 2.61, 31.6], look: [-7.0, 0.95, 30.2], rooms: ["lobby"] },   // down on the theater lobby's register, from the customers' side
-  { name: "THEATER", ceil: 6.0, at: [1.5, 5.91, 36], look: [-3.2, 0.9, 43.5], rooms: ["theater"] },   // the house and the screen, from the back corner
+  { name: "FRONT DOOR", short: "DOOR", ceil: 3.6, at: [10.55, 3.51, 0.55], look: [-2.5, 0.7, 5.5], rooms: ["store", "out"] },
+  { name: "AISLES", short: "AISLE", ceil: 3.6, at: [-7.3, 3.51, 9.5], look: [6.5, 0.6, 15.5], rooms: ["store"] },
+  { name: "LOUNGE", short: "LOUNGE", ceil: 3.6, at: [10.55, 3.51, 27.5], look: [-2, 0.6, 20], rooms: ["store", "hall"] },
+  { name: "BACK HALL", short: "HALL", ceil: 2.7, at: [2.3, 2.61, 28.3], look: [9.2, 0.9, 29.3], rooms: ["hall", "store"] },
+  { name: "REGISTER", short: "REG", ceil: 3.6, at: [-5.45, 3.51, 1.75], look: [-5.45, 1.0, 3.9], rooms: ["store"] },   // over the clerk's shoulder, down on the till
+  { name: "CONCESSIONS", short: "CONC", ceil: 2.7, at: [-5.3, 2.61, 31.6], look: [-7.0, 0.95, 30.2], rooms: ["lobby"] },   // down on the theater lobby's register, from the customers' side
+  { name: "THEATER", short: "THTR", ceil: 6.0, at: [1.5, 5.91, 36], look: [-3.2, 0.9, 43.5], rooms: ["theater"] },   // the house and the screen, from the back corner
+  // and outside, round the back: box cameras on brackets off the walls (wall: where the bracket's bolted on), up under the sodium wall packs (exterior/lot.js)
+  { name: "BACK LOT", short: "BACK", wall: [11.1, 3.75, 35.1], at: [10.85, 3.7, 35.45], look: [3.5, 0.4, 41.5], rooms: ["out"] },        // behind the store: the hammerhead, the back ladder, the island
+  { name: "EAST LANE", short: "EAST", wall: [11.1, 3.75, 34.7], at: [11.45, 3.7, 34.45], look: [13.2, 0.4, 19.5], rooms: ["out"] },     // down the lane: the emergency exit, the dumpster, Tony's back door
+  { name: "WEST LANE", short: "WEST", wall: [-7.84, 4.4, 48.3], at: [-8.2, 4.35, 48.05], look: [-10.2, 0.3, 34], rooms: ["out"] },      // the theater's fire exit and on down the west side
 ];
 const SEC_W = 256, SEC_H = 192;
 {
@@ -270,8 +274,8 @@ const SEC_W = 256, SEC_H = 192;
   {
     const SX = x1 - 0.31, SZ = 33.55, SL = 1.62, shelfM = phong(0x6c6a60, 30), S = officeFx.sec;
     bx(0.56, 0.03, SL, phong(0x8e8a78, 22, 0x333333), x1 - 0.28, 0.74, SZ);                          // the bench
-    for (const sz of [-1, 1]) { bx(0.5, 0.74, 0.03, shelfM, x1 - 0.28, 0.37, SZ + sz * (SL / 2 - 0.02)); bx(0.03, 2.05, 0.03, shelfM, x1 - 0.04, 1.02, SZ + sz * (SL / 2 - 0.02)); }
-    bx(0.42, 0.02, SL - 0.02, shelfM, x1 - 0.24, 1.38, SZ); bx(0.42, 0.02, SL - 0.02, shelfM, x1 - 0.24, 1.72, SZ);   // two shelves of monitors, on their uprights
+    for (const sz of [-1, 1]) { bx(0.5, 0.74, 0.03, shelfM, x1 - 0.28, 0.37, SZ + sz * (SL / 2 - 0.02)); bx(0.03, 2.4, 0.03, shelfM, x1 - 0.04, 1.2, SZ + sz * (SL / 2 - 0.02)); }
+    bx(0.42, 0.02, SL - 0.02, shelfM, x1 - 0.24, 1.38, SZ); bx(0.42, 0.02, SL - 0.02, shelfM, x1 - 0.24, 1.72, SZ); bx(0.42, 0.02, SL - 0.02, shelfM, x1 - 0.24, 2.06, SZ);   // three shelves of monitors, on their uprights
     colliders.push({ x0: x1 - 0.56, x1, z0: SZ - SL / 2, z1: SZ + SL / 2, y1: 0.74 });
     // the screens: each shows its camera's picture through a scanline shader, in the room's own light level (they're lit, not lit by)
     const feedMat = (map, label) => new THREE.ShaderMaterial({
@@ -310,12 +314,23 @@ const SEC_W = 256, SEC_H = 192;
       const canvas2 = document.createElement("canvas"); canvas2.width = SEC_W; canvas2.height = SEC_H;
       const lab = new THREE.CanvasTexture(canvas2); lab.minFilter = THREE.LinearFilter; lab.generateMipmaps = false;
       S.cams.push({ ...cam, i, rt, camera: camera3, canvas: canvas2, lab, mins: -1 });
-      S.cams[i].mat = i < 4 ? crt(x1 - 0.42, 1.535, SZ - 0.51 + i * 0.34, 0.31, 0.29, 0.3, rt.texture, lab) : crt(x1 - 0.42, 1.875, SZ - 0.34 + (i - 4) * 0.34, 0.31, 0.29, 0.3, rt.texture, lab);
+      S.cams[i].mat = i < 4 ? crt(x1 - 0.42, 1.535, SZ - 0.51 + i * 0.34, 0.31, 0.29, 0.3, rt.texture, lab) : i < 7 ? crt(x1 - 0.42, 1.875, SZ - 0.34 + (i - 4) * 0.34, 0.31, 0.29, 0.3, rt.texture, lab)
+        : crt(x1 - 0.42, 2.215, SZ - 0.34 + (i - 7) * 0.34, 0.31, 0.29, 0.3, rt.texture, lab);   // (the top shelf: the ones outside)
+      S.cams[i].tally = new THREE.MeshBasicMaterial({ color: 0x301010 });
+      if (cam.wall) {                              // outside: a weatherproof box camera, a sunshield over it, on an arm off the wall; the tally light on its back
+        const ext = o => { o.traverse(k => k.layers.set(EXTERIOR_LAYER)); return o; }, w = new THREE.Vector3(...cam.wall), housing = lam(0xd9d6cc), dark = lam(0x2a2b2d);
+        const head = new THREE.Group(); head.position.copy(from); head.lookAt(lookAt); scene.add(head);   // (its +z: down the lens)
+        bx(0.1, 0.1, 0.3, housing, 0, 0, -0.02, head); bx(0.14, 0.012, 0.36, housing, 0, 0.062, 0.0, head); bx(0.09, 0.09, 0.012, dark, 0, 0, 0.134, head);
+        glow(put(new THREE.SphereGeometry(0.01, 8, 6), S.cams[i].tally, 0.03, 0.03, -0.172, 0, head));
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 8), dark), d = from.clone().sub(w);
+        arm.scale.y = d.length(); arm.position.copy(w).add(from).multiplyScalar(0.5); arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); scene.add(arm);
+        const plate = bx(0.12, 0.16, 0.12, dark, w.x, w.y, w.z); [head, arm, plate].forEach(ext);
+        return;
+      }
       // the camera itself, out in the store: a smoked dome in the ceiling, a red tally light on its trim ring when it's up on the spot monitor
       const C = cam.ceil;
       cyl(0.1, 0.1, 0.03, domeBase, from.x, C - 0.016, from.z, 16);
       put(new THREE.SphereGeometry(0.08, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), domeGlass, from.x, C - 0.03, from.z);
-      S.cams[i].tally = new THREE.MeshBasicMaterial({ color: 0x301010 });
       const tx = from.x + Math.sign(lookAt.x - from.x || 1) * 0.088; glow(put(new THREE.SphereGeometry(0.008, 8, 6), S.cams[i].tally, tx, C - 0.034, from.z));
     });
     const spotLab = document.createElement("canvas"); spotLab.width = SEC_W; spotLab.height = SEC_H;
@@ -333,15 +348,15 @@ const SEC_W = 256, SEC_H = 192;
     // the switcher: a steel console on the bench in front of the spot monitor, a row of square push buttons: 1 2 3 4, SEQ, POWER
     {
       const sw = grp(x1 - 0.47, 0.815, SZ + 0.03, Math.PI / 2), tilt = grp(0, 0, 0, 0, sw), face = phong(0x3b3d41, 24); tilt.rotation.x = 1.2;   // (its top leaning back toward the wall)
-      bx(0.72, 0.17, 0.03, face, 0, 0, 0.016, tilt); bx(0.7, 0.06, 0.15, face, 0, -0.03, 0.02, sw);
+      const nc = SEC_CAMS.length, SWW = 0.072 * (nc + 2);   // (a button and its gap each)
+      bx(SWW + 0.02, 0.17, 0.03, face, 0, 0, 0.016, tilt); bx(SWW, 0.06, 0.15, face, 0, -0.03, 0.02, sw);
       const label = makeTexture((ctx, tw, th) => {
-        ctx.fillStyle = "#30343a"; ctx.fillRect(0, 0, tw, th); ctx.fillStyle = "#d6d6c9"; ctx.font = "bold 22px Arial"; ctx.textAlign = "center"; ctx.fillText("VIDEO SWITCHER  VS-4", tw / 2, 26);
-        ctx.font = "bold 14px Arial"; ["1 DOOR", "2 AISLE", "3 LOUNGE", "4 HALL", "5 REG", "6 CONC", "7 THTR", "SEQ", "POWER"].forEach((t, i) => ctx.fillText(t, tw * (i + 0.5) / 9, th - 12));
-      }, 768, 148);
-      sheet(new THREE.MeshLambertMaterial({ map: label }), 0.7, 0.135, 0, 0, -0.002, Math.PI, tilt);
-      const nc = SEC_CAMS.length;
+        ctx.fillStyle = "#30343a"; ctx.fillRect(0, 0, tw, th); ctx.fillStyle = "#d6d6c9"; ctx.font = "bold 22px Arial"; ctx.textAlign = "center"; ctx.fillText("VIDEO SWITCHER  VS-12", tw / 2, 26);
+        const names = [...SEC_CAMS.map((c, i) => `${i + 1} ${c.short}`), "SEQ", "POWER"]; ctx.font = "bold 12px Arial"; names.forEach((t, i) => ctx.fillText(t, tw * (i + 0.5) / names.length, th - 12));
+      }, 1024, 148);
+      sheet(new THREE.MeshLambertMaterial({ map: label }), SWW, 0.135, 0, 0, -0.002, Math.PI, tilt);
       for (let i = 0; i < nc + 2; i++) {
-        const lit = new THREE.MeshBasicMaterial({ color: 0x180808 }), kind = i < nc ? i : i === nc ? "seq" : "power", dx = 0.7 * (0.5 - (i + 0.5) / (nc + 2));   // (reading left to right, as you stand at it, each over its label)
+        const lit = new THREE.MeshBasicMaterial({ color: 0x180808 }), kind = i < nc ? i : i === nc ? "seq" : "power", dx = SWW * (0.5 - (i + 0.5) / (nc + 2));   // (reading left to right, as you stand at it, each over its label)
         const b = bx(0.058, 0.045, 0.018, new THREE.MeshPhongMaterial({ color: i < nc ? 0xc8c5b8 : i === nc ? 0xc99a1f : 0xaa2222, specular: 0x777777, shininess: 40 }), dx, 0.002, -0.011, tilt);
         glow(bx(0.012, 0.01, 0.004, lit, dx, 0.044, -0.004, tilt));
         const pad = bx(0.074, 0.1, 0.05, new THREE.MeshBasicMaterial({ visible: false }), dx, 0.005, -0.01, tilt);

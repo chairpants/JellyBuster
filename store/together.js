@@ -204,9 +204,14 @@ function tgSend() {
   }
   tgWorldTick();
   const g = me.group.position, r = v => Math.round(v * 1000) / 1000;
-  const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : null;
+  const sit = onStool ? STOOL_SIT : seated ? (seatAt?.hipY ? { hipY: seatAt.hipY } : {}) : PARK.ride && PARK.sit ? PARK.sit : null;
   const pose = fall ? 3 : sit ? 2 : keys.has("KeyC") ? 1 : 0;
-  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.prone ? -fall.tilt : fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0])); } catch {}
+  // the park (exterior/playground.js): on the seesaw (1: sat on end e, 2: stood on the plank u along it) and how it's tipped, for the
+  // other's copy (the host's is the one that counts); on a swing (which one, + 1) and where it's got to
+  const R = PARK.ride, su = seesawOn(), see = R?.kind === "seesaw" ? [1, R.e] : su != null ? [2, r(su)] : [0, 0];
+  const sw = R?.kind === "swing" ? [R.i + 1, r(SWING.seats[R.i].th), r(swingAt(SWING.seats[R.i]).r)] : [0, 0, 0];
+  try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.prone ? -fall.tilt : fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0,
+    ...see, r(SEESAW.a), r(SEESAW.w), ...sw])); } catch {}
 }
 function tgOnCtl(data, mine) {
   const T = together; if (mine !== T.try) return;
@@ -220,6 +225,7 @@ function tgOnCtl(data, mine) {
   }
   if (d.t === "vcr") return tgVcrApply(d);
   if (d.t === "world") return tgWorldApply(d);
+  if (d.t === "seesaw") { if (Math.abs(d.e) === 1) seesawPush(d.e, true); return; }   // they pushed off from their end
   if (d.t !== "hi" || T.peer) return;
   tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest, d.outfit);
   if (T.host && playing) tgVcrSend();           // (a tape's already going: on theirs too)
@@ -231,7 +237,12 @@ function tgOnCtl(data, mine) {
 function tgOnPos(data, mine) {
   const T = together, P = T.peer; if (mine !== T.try || !P) return;
   let a; try { a = JSON.parse(data); } catch { return; }
-  if (!Array.isArray(a) || a.length !== 8 || !a.every(Number.isFinite)) return;
+  if (!Array.isArray(a) || (a.length !== 8 && a.length !== 15) || !a.every(Number.isFinite)) return;   // (8: from a copy of the game before the park's rides were shared)
+  if (a.length === 15) {
+    P.see = a[8] === 1 && Math.abs(a[9]) === 1 ? { ride: true, e: a[9] } : a[8] === 2 && Math.abs(a[9]) < 2 ? { ride: false, u: a[9] } : null;
+    P.seeA = Math.max(-SEESAW.max, Math.min(SEESAW.max, a[10])); P.seeW = Math.max(-10, Math.min(10, a[11]));
+    P.swing = a[12] >= 1 && a[12] <= SWING.seats.length ? { i: a[12] - 1, th: a[13], r: Math.max(0, Math.min(SWING.L, a[14])) } : null;
+  } else P.see = P.swing = null;
   P.heard = performance.now();
   if (Math.abs(a[0]) > 500 || Math.abs(a[1]) > 100 || Math.abs(a[2]) > 500) return;   // (nowhere in this world)
   P.to = { x: a[0], y: a[1], z: a[2], ry: a[3] };
@@ -388,6 +399,10 @@ function togetherTick(dt) {                     // the main loop: eases them to 
   g.position.x += dx * k; g.position.y += dy * k; g.position.z += dz * k;
   P.ry += Math.atan2(Math.sin(P.to.ry - P.ry), Math.cos(P.to.ry - P.ry)) * k; g.rotation.y = P.ry;
   P.speed += (d * k / Math.max(dt, 1e-4) - P.speed) * Math.min(1, dt * 10);   // smoothed, or the legs flicker between updates
+  // sat on the seesaw or a swing: put on the seat as it is in this copy, so they ride it rather than float beside it
+  if (P.see?.ride) { const s = seesawSeat(P.see.e); g.position.set(s.x, s.y + 0.03 - 0.45, s.z); g.rotation.y = P.ry = Math.atan2(s.dx, s.dz); g.rotation.x = 0; P.speed = 0; }
+  else if (P.swing) { const S = SWING.seats[P.swing.i], s = swingAt(S), hip = 0.06, hipY = 0.5;
+    g.position.set(s.x + s.ux * hip - s.ux * hipY, s.y + s.uy * hip - s.uy * hipY, s.z + s.uz * hip - s.uz * hipY); g.rotation.y = P.ry = SWING.ry; g.rotation.x = -S.th; P.speed = 0; }
   P.c.tick(dt, P.speed < 0.15 || P.tilt > 0.05 ? 0 : P.speed);
 }
 

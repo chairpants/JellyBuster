@@ -252,7 +252,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   };
   // and one driving by on the road: the ambience's passing-car sound calls this, so you see what you hear.
   // Right-hand traffic: eastbound in the lane nearer the store
-  const movers = [], ROAD_END = 35, laneZ = dir => LOT.road[dir];
+  const movers = [], ROAD_END = 110, laneZ = dir => LOT.road[dir];
   let carIds = 0, traffic = [];                       // (traffic: this frame's moving cars, for keeping them out of each other: see carAhead)
   const roadPass = (look, dir, v, then) => {
     let x0 = -dir * ROAD_END; while ([...movers.map(m => m.g), ...lotCars.map(c => c.g)].some(o => o && Math.abs(o.position.z - laneZ(dir)) < 1.5 && Math.abs(o.position.x - x0) < 8)) x0 -= dir * 8;   // (not on top of one already there)
@@ -277,9 +277,9 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   const spline = pts => new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
   const gateFor = d => { const [a, b] = LOT.drives[d > 0 ? 0 : 1]; return (a + b) / 2; };   // in: the near end for the way you're coming; out: the far end for the way you're going
   const inPath = (d, E, back = 0) => { const L = LOT.road[d], A = LOT.lane[d];   // from the road, through the driveway, into its lane (back: start that much further off)
-    return spline([[E - d * (34 + back), L], [E - d * 7, L], [E - d * 1.6, L + 0.7], [E, LOT.roadNear], [E, lotFar], [E + d * 0.8, (lotFar + A) / 2], [E + d * 3.2, A - 0.2 * Math.sign(A + 4.8)], [E + d * 7, A]]); };
+    return spline([[E - d * (90 + back), L], [E - d * 34, L], [E - d * 7, L], [E - d * 1.6, L + 0.7], [E, LOT.roadNear], [E, lotFar], [E + d * 0.8, (lotFar + A) / 2], [E + d * 3.2, A - 0.2 * Math.sign(A + 4.8)], [E + d * 7, A]]); };
   const outPath = (e, X, x0) => { const L = LOT.road[e], A = LOT.lane[e];   // from its lane, out the driveway, onto the road and away
-    return spline([[x0, A], [X - e * 3.5, A], [X - e * 0.8, (lotFar + A) / 2], [X, lotFar], [X, LOT.roadNear], [X + e * 1.6, L + 0.7], [X + e * 7, L], [X + e * 36, L]]); };
+    return spline([[x0, A], [X - e * 3.5, A], [X - e * 0.8, (lotFar + A) / 2], [X, lotFar], [X, LOT.roadNear], [X + e * 1.6, L + 0.7], [X + e * 7, L], [X + e * 36, L], [X + e * 90, L]]); };
   driveIn = (look, onParked, near) => {            // -> the car (where to get out: car.door), or null: no free stall. near: an x to park close to (next door's customers)
     const taken = new Set([...parked.map(g => g.userData.stall), ...lotCars.map(c => c.stall)]);
     let free = [...Array(22).keys()].filter(k => !LOT.noPark.includes(k) && !taken.has(k)); if (!free.length) return null;
@@ -287,7 +287,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     const k = free[Math.floor(Math.random() * free.length)], sx = stallX(k), ways = [1, -1].filter(d => (sx - gateFor(d)) * d >= 10);   // (a stall right by a driveway: from the other end)
     const dir = ways[Math.floor(Math.random() * ways.length)];   // which way it's coming along the road (and up the drive)
     const c = { id: ++carIds, look, stall: k, sx, dir, phase: "approach", t: 0, u: 0, g: null, onParked, door: { x: sx - 1.2, z: PARK_Z } };   // the driver's side: west, nosed in toward the road
-    let back = 0; const sx0 = gateFor(dir) - dir * 34;   // (somebody already starting out there: further back)
+    let back = 0; const sx0 = gateFor(dir) - dir * 90;   // (somebody already starting out there: further back)
     while ([...movers.map(m => m.g), ...lotCars.map(o => o.g)].some(o => o && Math.abs(o.position.z - LOT.road[dir]) < 1.5 && Math.abs(o.position.x - (sx0 - dir * back)) < 9)) back += 9;
     c.path = inPath(dir, gateFor(dir), back); c.len = c.path.getLength();
     const p0 = c.path.getPointAt(0); c.g = car(p0.x, p0.z, 0, { ...STYLES[look.s], color: look.c });
@@ -333,8 +333,9 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     for (const c of [...lotCars]) {
       const A = LOT.lane[c.dir];
       if (c.phase === "approach") {                  // along the road and round in at the driveway: road speed, slowing for the turn
-        const v = c.u < 0.55 ? 11 : c.u < 0.75 ? 11 - (c.u - 0.55) / 0.2 * 6.5 : 4.5;
-        lampSet(c.g, { ...running(), tail: c.u > 0.5 && c.u < 0.78 ? 2 : running().tail });
+        const u = 1 - (1 - c.u) * c.len / (c.len - 56);   // (how far along the last stretch: the 56 m before it is just coming up the road from out of sight)
+        const v = u < 0.55 ? 11 : u < 0.75 ? 11 - (u - 0.55) / 0.2 * 6.5 : 4.5;
+        lampSet(c.g, { ...running(), tail: u > 0.5 && u < 0.78 ? 2 : running().tail });
         if (along(c, v, dt)) c.phase = "aisle";
       } else if (c.phase === "aisle") {               // up its lane toward the stall, the turn in starts 3 m short of it
         if (carAhead(c.g, 5)) { lampSet(c.g, { head: night(), tail: 2 }); continue; }
@@ -362,9 +363,10 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
         if (c.t >= 0.6) { c.phase = "leave"; c.path = outPath(c.e, gateFor(-c.e), c.g.position.x); c.len = c.path.getLength(); c.u = 0; }
       } else if (c.phase === "leave") {               // down the lane, out the driveway and off along the road
         const X = gateFor(-c.e), L = LOT.road[c.e];       // (at the curb: a gap in the traffic coming along its lane first)
-        if (c.u > 0.3 && c.u < 0.55 && movers.some(m => Math.abs(m.g.position.z - L) < 1.5 && (X - m.g.position.x) * c.e > -3 && (X - m.g.position.x) * c.e < 22)) { lampSet(c.g, { head: night(), tail: 2 }); continue; }
-        lampSet(c.g, { ...running(), tail: c.u > 0.15 && c.u < 0.3 ? 2 : running().tail });
-        if (along(c, c.u < 0.4 ? 5 : 11, dt)) { c.g.removeFromParent(); lotCars.splice(lotCars.indexOf(c), 1); c.phase = "gone"; }
+        const u = c.u * c.len / (c.len - 54);            // (as it was before the road ran on out of sight: the last 54 m is just driving away)
+        if (u > 0.3 && u < 0.55 && movers.some(m => Math.abs(m.g.position.z - L) < 1.5 && (X - m.g.position.x) * c.e > -3 && (X - m.g.position.x) * c.e < 22)) { lampSet(c.g, { head: night(), tail: 2 }); continue; }
+        lampSet(c.g, { ...running(), tail: u > 0.15 && u < 0.3 ? 2 : running().tail });
+        if (along(c, u < 0.4 ? 5 : 11, dt)) { c.g.removeFromParent(); lotCars.splice(lotCars.indexOf(c), 1); c.phase = "gone"; }
       }
     }
   };
@@ -405,10 +407,10 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     for (let i = 0; i < n; i++) dash.setMatrixAt(i, m4.makeTranslation(-ROAD_X + 0.8 + i * 1.7, LOT.y + 0.002, (LOT.roadNear + roadFar) / 2));
     dash.frustumCulled = false; ea(dash); }
   ground(roadFar, grassFar, mat.grass);                  // a much deeper stretch of grass on the far side
-  const benchZ = roadFar - 2.2;                          // a bench facing back toward the store, just past the road
-  eb(1.3, 0.05, 0.4, mat.bench, 0, 0.42, benchZ);
-  eb(1.3, 0.4, 0.05, mat.bench, 0, 0.62, benchZ + 0.18);
-  for (const lx of [-0.55, 0.55]) eb(0.06, 0.42, 0.06, mat.dark, lx, 0.21, benchZ);
+  { const g = new THREE.Mesh(new THREE.PlaneGeometry(EDGE.SEE * 2, 1.2), mat.sidewalk); g.rotation.x = -Math.PI / 2; g.position.set(0, 0.004, roadFar - 0.75); ea(g);   // the public walk along the far side, past the park and on with the road
+    const jg = new THREE.PlaneGeometry(0.025, 1.2); jg.rotateX(-Math.PI / 2); const joints = new THREE.InstancedMesh(jg, mat.dark, Math.floor(EDGE.SEE)), m4 = new THREE.Matrix4();
+    for (let i = 0; i < joints.count; i++) joints.setMatrixAt(i, m4.makeTranslation(x0 + 1 + 2 * (i - Math.floor(EDGE.SEE / 2) + 13), 0.006, roadFar - 0.75)); joints.frustumCulled = false; ea(joints); }   // (the joints every 2 m, in step with the store's walk: the slabs' shading goes by the same joints)
+  const benchZ = roadFar - 2.2;                          // the park's bench by the walk, just past the road (built with the park: exterior/playground.js); its lamp's below
 
   // night lighting — these only come on when setExteriorDay flips to night.
   // Each entry remembers its "on" value; lenses also join the bloom layer so
@@ -447,13 +449,37 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   };
   for (const x of LOT.lampX) streetLamp(x, (lotFar + LOT.roadNear) / 2);   // out on the grass strip (see LOT.lampX)
 
+  // security lights round the sides and backs of both buildings: bronze wall packs, a hood over a prismatic refractor angled down, each throwing a
+  // fan of sodium out and down off its wall (aimed off it, so none of it comes in through the wall). They strike and warm up with the lot's.
+  // x, y, z: on the wall's face; nx, nz: out from it; reach: how far out the middle of the pool lands
+  const packM = new THREE.MeshPhongMaterial({ color: 0x3b3226, specular: 0x222222, shininess: 20 });
+  const wallPack = (x, y, z, nx, nz, reach = 6) => {
+    const lens = new THREE.MeshLambertMaterial({ color: 0x3a2e1c, emissive: 0xffae4a, emissiveIntensity: 0 }), g = new THREE.Group();
+    g.position.set(x, y, z); g.rotation.y = Math.atan2(nx, nz);                 // (its +z: out from the wall)
+    const part = (w, h, d, m, px, py, pz, rx = 0) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(px, py, pz); o.rotation.x = rx; o.layers.set(EXTERIOR_LAYER); g.add(o); return o; };
+    part(0.36, 0.32, 0.05, packM, 0, 0, 0.025);                                  // the back box, on the wall
+    part(0.34, 0.1, 0.24, packM, 0, 0.1, 0.15, -0.12);                           // the hood
+    for (const sx of [-0.16, 0.16]) part(0.02, 0.24, 0.2, packM, sx, -0.02, 0.13);
+    part(0.3, 0.2, 0.02, lens, 0, -0.03, 0.235, -0.45).layers.enable(BLOOM_LAYER);   // the refractor, tipped down
+    part(0.32, 0.03, 0.12, lens, 0, -0.13, 0.15).layers.enable(BLOOM_LAYER);
+    scene.add(g);
+    const spot = new THREE.SpotLight(0xffae4a, 0, 17, 1.05, 0.6, 1.5); spot.layers.set(EXTERIOR_LAYER);
+    spot.position.set(x + nx * 0.3, y - 0.12, z + nz * 0.3); spot.target.position.set(x + nx * reach, 0, z + nz * reach); scene.add(spot, spot.target);
+    sodium.push({ lens, spot, delay: 0, full: 38 });
+  };
+  wallPack(9.5, 3.3, 35.1, 0, 1);            // the store's back wall, over the hammerhead and the back ladder
+  wallPack(11.1, 2.95, 26.85, 1, 0, 5);      // the store's east wall, over the emergency exit and the dumpster
+  wallPack(-7.84, 3.3, 16, -1, 0);           // the store's west wall, down the west lane
+  wallPack(-7.84, 3.6, 43.2, -1, 0, 5);      // the theater's west wall, by the fire exit's stairwell
+  wallPack(-3, 4.6, 48.6, 0, 1, 7);          // the theater's back wall, out over the service road
+  wallPack(21, 3.3, 8, 1, 0);                // Tony's east wall, down the east lane
+
   // ornamental park lamp beside the bench: black wrought iron, stepped
   // octagonal base, slim shaft with a collar, flared lantern with a pyramid
   // cap and finial — softer and warmer than the sodium lot lights
   const iron = new THREE.MeshPhongMaterial({ color: 0x121212, specular: 0x333333, shininess: 40 });
   const lanternGlass = glowMat(0x4a3a1c, 0xffcf7a, 1.3);
-  {
-    const px = 1.2, pz = benchZ;
+  const parkLamp = (px, pz) => {
     ecyl(0.2, 0.24, 0.12, iron, px, 0.06, pz, 8);                           // plinth
     ecyl(0.12, 0.16, 0.4, iron, px, 0.32, pz, 8);                           // tapered base
     ecyl(0.14, 0.14, 0.04, iron, px, 0.54, pz, 12);                         // collar
@@ -466,11 +492,15 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     cap.position.set(px, 3.47, pz); cap.rotation.y = Math.PI / 4;
     const finial = ea(new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), iron)); finial.position.set(px, 3.6, pz);
     nightLight(new THREE.PointLight(0xffcf7a, 0, 10, 1.5), 14).position.set(px, 3.15, pz);
-  }
+  };
+  parkLamp(1.2, benchZ);
+  // and more of them in the park itself, for after dark: each well clear of the rocket, the merry-go-round, the seesaw and
+  // the swings' arc (exterior/playground.js), and of the paths between them. A post you can't walk through
+  for (const [px, pz] of [[-7.5, -27.5], [9, -25], [5.5, -37.5], [15.5, -36.5]]) { parkLamp(px, pz); colliders.push({ x0: px - 0.22, x1: px + 0.22, z0: pz - 0.22, z1: pz + 0.22 }); }
 
   // the trees: a layered pine (stacked tapering cones) and a round broadleaf (lumpy icosahedra), the treeline
   // across the road and now groves and a treeline all round, swaying, and the broadleaf ones through the seasons (trees.js)
-  StoreTrees.build({ scene, layer: EXTERIOR_LAYER, rows: [treesNear, (treesNear + treesFar) / 2, treesFar], x0, x1, avoid: ROOF.rects,
+  StoreTrees.build({ scene, layer: EXTERIOR_LAYER, rows: [], x0, x1, avoid: ROOF.rects,
     road: [LOT.roadFar, LOT.curb], lotY: LOT.y, lot: [LOT.gates[0] - LOT.gateW / 2 - 6, LOT.gates[1] + LOT.gateW / 2 + 6, LOT.curb] });
 
   // fills any gaps above/between the trees. Unlit and exempt from fog: the
@@ -537,7 +567,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
       if (k < 1) done = false;
       if (k <= 0) continue;                    // not struck yet
       const strike = k < 0.06 && Math.random() < 0.35 ? 0.3 : 1;   // a little sputter as it strikes
-      s.spot.intensity = 72 * k * k * strike;  // slow start, then climbs to full
+      s.spot.intensity = (s.full ?? 72) * k * k * strike;  // slow start, then climbs to full
       s.lens.emissiveIntensity = 1.6 * (0.12 + 0.88 * k) * strike;
       s.spot.color.copy(cold).lerp(warm, k); s.lens.emissive.copy(cold).lerp(warm, k);
     }

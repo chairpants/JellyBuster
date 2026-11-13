@@ -35,6 +35,8 @@ function meTick(dt) {
     me.setPose("sit", seatAt.hipY ? { hipY: seatAt.hipY } : undefined);
   } else if (golf.on) {                      // at address on the roof (see golfTick)
     g.position.copy(golfStance()); g.rotation.y = golf.aim - Math.PI / 2 + Math.PI; me.setPose("idle");
+  } else if (PARK.climb || PARK.ride) {      // at the park: up a ladder, on a swing, the seesaw, the slide (exterior/playground.js)
+    parkBody(g);
   } else if (roof.climb) {                   // on the closet ladder, facing the rungs
     g.position.set(roof.cam.x, roof.cam.y - 1.65, roof.cam.z + 0.21); g.rotation.y = Math.PI; me.setPose("idle");
   } else if (ladder.on) {                    // up on the top step, facing the ladder
@@ -59,15 +61,22 @@ function meTick(dt) {
 // at arm's length, swinging as you walk, low in a crouch. (Tools and the ladder pose the arms themselves.)
 // Returns an undo, so everything else keeps seeing the item at its own spot
 let meHolding = false;
-const meGrip = new THREE.Vector3();
+const meGrip = new THREE.Vector3(), meQ = new THREE.Quaternion(), meQ2 = new THREE.Quaternion();
+const TAPE_GRIP = new THREE.Vector3(0.036, -0.44, 0.006);   // the tape's middle, in the right forearm's frame: just off the palm, down in the fingers
+const TAPE_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 function meHandFollow() {
   const g = [handGroup, snackGroup, popcornGroup, coHand, postitHeld?.mesh].find(o => o?.visible && o.parent === camera);
   if (!g || toolHeld || ladder.on || roof.climb || golf.on) { if (meHolding && !toolHeld && !ladder.on && !golf.on) me.reachTo(null); meHolding = false; return null; }
   camera.updateMatrixWorld();
   me.reachTo(camera.localToWorld(meGrip.copy(g.position)), 0, { lean: false }); meHolding = true;   // (lands next tick)
-  me.group.updateMatrixWorld(true); me.rig.arms[0].hand.getWorldPosition(meGrip);
-  const rest = g.position.clone(); g.position.copy(camera.worldToLocal(meGrip));
-  return () => g.position.copy(rest);
+  me.group.updateMatrixWorld(true);
+  const rest = g.position.clone(), restQ = g.quaternion.clone();
+  if (g === handGroup) {                          // a tape: in the curl of the fingers, its face to the palm, lying along the hand (the forearm's frame: see the hand in customers.js)
+    const el = me.rig.arms[0].el; el.localToWorld(meGrip.copy(TAPE_GRIP));
+    g.quaternion.copy(camera.getWorldQuaternion(meQ).invert()).multiply(el.getWorldQuaternion(meQ2)).multiply(TAPE_TURN);   // (turned round: the cover out, where you can see it)
+  } else me.rig.arms[0].hand.getWorldPosition(meGrip);
+  g.position.copy(camera.worldToLocal(meGrip));
+  return () => { g.position.copy(rest); g.quaternion.copy(restQ); };
 }
 // the censor: a pixel mosaic over your lap, redrawn a few times a second so it shimmers like a TV blur
 let meToilet = false;
@@ -249,15 +258,17 @@ const hungover = () => drunk.hang && shift.h < 13;     // till lunch
 // walking forward pulls you off to one side or the other. Wears off over ~20 s
 const dizzy = { v: 0, t: 0, blur: "", said: false, ph: 0 };
 function dizzyTick(dt) {
+  const roundSpin = PARK.ride?.kind === "round" ? Math.abs(ROUND.w) : 0;   // (holding on to the merry-go-round, exterior/playground.js)
   if (onStool && stool.vel > 5) dizzy.v = Math.min(1, dizzy.v + dt * stool.vel / STOOL.MAX / 8);   // ~8 s flat out to max
+  else if (roundSpin > 2) dizzy.v = Math.min(1, dizzy.v + dt * roundSpin / ROUND.max / 8);
   else dizzy.v = Math.max(0, dizzy.v - dt / 20);
   const spin = Math.max(0, (dizzy.v - 0.3) / 0.7);   // the first few seconds of spinning are free
   const k = Math.max(spin, drunkTick(dt));         // drunk: the same sway, blur and pull, without the room going round
   dizzy.t += dt;
-  if (spin && !(onStool && stool.vel > 2)) player.yaw -= spin * 0.7 * dt * (1 + 0.4 * Math.sin(dizzy.t * 0.9));   // the room keeps going round the other way
+  if (spin && !(onStool && stool.vel > 2) && roundSpin < 1) player.yaw -= spin * 0.7 * dt * (1 + 0.4 * Math.sin(dizzy.t * 0.9));   // the room keeps going round the other way
   if (spin > 0.5 && !dizzy.said) { dizzy.said = true; toast("Whoa... the room's still spinning", true); }
   if (!k) { dizzy.said = false; dizzy.ph = Math.random() * Math.PI * 2; }   // next time it may pull the other way first
-  if (k && !onStool && !seated && (keys.has("KeyW") || keys.has("ArrowUp"))) player.yaw += k * 1.3 * dt * Math.sin(dizzy.t * 0.7 + dizzy.ph);   // walking: pulled left, then right...
+  if (k && !onStool && !seated && !PARK.ride && (keys.has("KeyW") || keys.has("ArrowUp"))) player.yaw += k * 1.3 * dt * Math.sin(dizzy.t * 0.7 + dizzy.ph);   // walking: pulled left, then right...
   const dim = Math.max(drunkDim(), hungover() ? 0.18 * Math.max(0, Math.sin(dizzy.t * 1.2)) ** 6 : 0);   // blacked out / a hangover's throb
   const blur = [k > 0.05 && `blur(${(k * 2.5).toFixed(1)}px)`, dim > 0.01 && `brightness(${(1 - dim).toFixed(2)})`].filter(Boolean).join(" ");
   if (blur !== dizzy.blur) canvas.style.filter = dizzy.blur = blur;
@@ -366,6 +377,7 @@ addEventListener("mousemove", e => {
 });
 function blocked(x, z) {
   if (!fall && hangerAt(x, z)) return true;      // (your head: a sign's in the way, unless you're going fast enough to find out: see FALL.bonk)
+  if (PARK.deck) return rocketBlocked(x, z);     // up in the rocket (exterior/playground.js)
   const r = player.r, near = Math.hypot(x - player.x, z - player.z) < 1;   // (a step from where you are: anywhere else, just what's there)
   if (player.onRoof) return !onDeck(x, z) || (near && Math.abs(roofY(x, z) - roofY(player.x, player.z)) > 0.35)   // up top: the decks (the tall block's a wall from the low one but up the iron stair),
     || roof.cols.some(c => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r);                    // their parapets and their kit
@@ -375,8 +387,10 @@ function blocked(x, z) {
     const f0 = floorHeightAt(player.x, player.z), f1 = floorHeightAt(x, z);
     if (f1 - f0 > 0.4 || (f0 - f1 > 0.6 && !(f0 > TALL.booth - 0.1 && x < SHAFT.x0))) return true;
   }
-  if (SERVICE_ROAD.behindFence(x, z) && !SERVICE_ROAD.behindFence(player.x, player.z)) return true;   // (the fence runs out to the treeline: no going round the end of it)
+  if (SERVICE_ROAD.behindFence(x, z) && !SERVICE_ROAD.behindFence(player.x, player.z)) return true;
+  if (EDGE.off(x, z) && !EDGE.off(player.x, player.z)) return true;   // out front: the yard's fence, the woods, and the road's two ends (see EDGE, store/core.js)   // (the fence runs out to the treeline: no going round the end of it)
   if (CUSTOMER ? outBlocked(x, z) : tonyBlocked(x, z)) return true;
+  if (seesawBlocks(x, z)) return true;
   for (const c of colliders) if (!c.staff)       // (you walk through the staff: they can't pin you in a corner)
     if (x > c.x0 - player.r && x < c.x1 + player.r && z > c.z0 - player.r && z < c.z1 + player.r) {
       if (c.y1 != null && player.airH + floorHeightAt(x, z) >= c.y1 - 0.02) continue;   // (off the ground and over the top of it. A top's a height in the world and airH's from the floor you're on: the theater's goes below ground)
@@ -424,13 +438,14 @@ const JUMP = { g: 9.81, h: 0.48, airControl: 1.2, recover: 0.22 };
 const jump = { air: false, v: 0, vx: 0, vz: 0, recover: 0, dip: 0 };
 const jumpHeavy = () => stool.carried || cutout.carried || ladder.state === "carried" || boxCarry.length || bagCarry.length || toolHeld || cmove.item;
 function jumpStart() {
-  if (fall || mantle || jump.air || jump.recover > 0 || seated || onStool || ladder.on || roof.climb || inspecting || scrub || drunk.out || golf.on || jumpHeavy()) return false;
+  if (fall || mantle || jump.air || jump.recover > 0 || parkBusy() || seated || onStool || ladder.on || roof.climb || inspecting || scrub || drunk.out || golf.on || jumpHeavy()) return false;
   const h = JUMP.h * (1 + 0.02 * (lv("you", "con") - 1)) * (hungover() ? 0.6 : 1) * (keys.has("KeyC") ? 0.75 : 1);   // (CON: a little more spring; a hangover: a lot less; from a crouch you've not got your legs under you)
   jump.air = true; jump.v = Math.sqrt(2 * JUMP.g * h); jump.peak = null; return true;
 }
 function groundUnder(x, z) {                     // what you'd land on, up from the floor: the floor, or the top of something low you've got your feet over
   if (player.onRoof || player.inBooth) return 0;
-  let g = 0; const r = 0.12, f = floorHeightAt(x, z);
+  if (PARK.deck) return ROCKET.decks[PARK.deck] - floorHeightAt(x, z);   // (a deck of the rocket)
+  let g = seesawUnder(x, z, player.airH); const r = 0.12, f = floorHeightAt(x, z);
   for (const c of colliders) if (c.y1 != null && c.y1 - f > g && c.y1 - f <= player.airH + 0.03 && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) g = c.y1 - f;
   return g;
 }
@@ -445,7 +460,7 @@ function ceilingAt(x, z) {                        // what your head has to fit u
   return r === "out" ? Infinity : r === "store" ? STORE.h : r === "theater" ? TALL.ceil : BOH.h;
 }
 function mantleFind(fx, fz) {                     // -> where a climb from here would put you, or null
-  if (player.onRoof || player.inBooth || jumpHeavy()) return null;
+  if (player.onRoof || player.inBooth || PARK.deck || jumpHeavy()) return null;
   const feet = playerFloor(), r = player.r;
   let ledge = null, px, pz;
   for (const ahead of [0.05, MANTLE.probe]) {     // (close in first: a rail's thinner than the far one)
@@ -504,7 +519,7 @@ const FALL = { g: 9.81, slam: 4.2, bonk: 4, drop: 1.6, lie: 0.7, up: 1.0, knock:
 const FALL_WHY = { slam: "That wall's not going anywhere", drop: "Further down than it looked", drunk: "The floor came up to meet you", trip: "Watch your step" };
 let fall = null;
 function lowBlocker(x, z) {                      // what's in the way here, if it's all low enough to catch only your legs; otherwise null (a wall's a wall)
-  if (player.onRoof || player.inBooth) return null;
+  if (player.onRoof || player.inBooth || PARK.deck) return null;
   const r = player.r, feet = player.airH + floorHeightAt(x, z); let low = null;
   for (const c of colliders) if (!c.staff && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) {
     if (c.y1 != null && feet >= c.y1 - 0.02) continue;   // (already over it)
@@ -641,7 +656,7 @@ function eyeRoom() {                              // (main loop) stood up under 
   return h ? Math.max(0.9, h.y0 - feet - 0.17 - 0.01) : 1.65;
 }
 function drunkTopple(dt) {                        // drunk and up on something: not for long
-  if (!drunk.lvl || fall || mantle || jump.air || drunk.out) return;
+  if (!drunk.lvl || fall || mantle || jump.air || drunk.out || parkBusy()) return;   // (the rocket's cage holds you up)
   const up = ladder.on ? 2 : player.airH > 0.25 ? 1 : 0; if (!up) return;
   if (Math.random() < dt * [0, 0.15, 0.6, 1.5][Math.min(3, drunk.lvl)] * up) {
     const h = ladder.on ? LADDER.STEP * ladder.lift : player.airH;
@@ -690,6 +705,7 @@ function move(dt) {
   if (document.pointerLockElement !== canvas || roof.climb || cm.term || cm.sleeping || arcade.on) return;
   drunkTopple(dt);
   if (fall) return fallTick(dt);
+  if (PARK.ride || PARK.climb) return parkMove(dt);   // on the swings, the seesaw, the slide, a ladder in the rocket (exterior/playground.js)
   if (onStool) {                            // E spins you; a move key gets you up
     if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].some(k => keys.has(k))) stoolStand();
     return;

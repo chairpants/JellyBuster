@@ -289,6 +289,7 @@ function buildServiceRoad({ lam, ext }) {
     place.forEach(([x, z, ry], i) => { bars.setMatrixAt(i, M.compose(V.set(x, 0.004, z), Q.setFromEuler(E3.set(0, ry, 0)), S)); bars.setColorAt(i, c.setScalar(0.72 + rc() * 0.3).multiply(c.clone().set(i % 5 === 2 ? 0xe8dcc0 : 0xffffff)));
       const dx = Math.sin(ry) * BL / 2, dz = Math.cos(ry) * BL / 2; wallAlong(x - dx, z - dz, x + dx, z + dz, 0.2, 0.85); });
     bars.instanceMatrix.needsUpdate = true; bars.instanceColor.needsUpdate = true; g.add(bars);
+    SR.jersey = { geo, mat: bars.material, BL };   // (the county's yard next door has a few rows of the same: exterior/edges.js)
   }
 
   // ---- the island's curb, chipped where it's been driven over; a pair of yellow pipe bollards on each building corner a truck could clip; a drain and a manhole ----

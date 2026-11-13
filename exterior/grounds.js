@@ -7,6 +7,8 @@ function buildGrounds({ lam, put, bx, cy, ext, dark }) {
     [2.1, 11.1, 35.1, 48.6], [-7.84, 11.1, 48.6, 250]]) ground(x0, x1, z0, z1, mat.grass);   // (none under the building: the theater's floor goes down below it)
   { const n = weatheredSign("EMERGENCY EXIT\nNO ENTRY", 0.62, 0.26, { fg: "#f2f2ee", bg: "#a81a1c", seed: 91, bent: 0.008 }); n.position.set(0.024, 1.5, -storeExit.w / 2); n.rotation.y = Math.PI / 2; n.layers.set(EXTERIOR_LAYER); storeExit.leaf.add(n); }   // the notice on the store's emergency exit
   buildServiceRoad({ lam, ext });                  // the service road: its paving, fence, barriers
+  buildEdges({ lam, ext });                        // out front, where the world stops: the county's yard and its fence, the power line (exterior/edges.js)
+  buildPlayground({ lam, ext });                   // the park across the road (exterior/playground.js)
   for (const [x, z, seed, tilt] of [[-16.38, 0.42, 51, 0.022], [22.45, 0.4, 67, -0.03]]) {   // a sign at each way in
     const s = new THREE.Group(); scene.add(s); cy(0.03, 0.03, 2.2, lam(0x6a6e70), x, 1.1, z, 8, s);
     bx(1.15, 0.42, 0.012, lam(0x5e6264), x, 2.0, z - 0.034, s).rotation.z = tilt;                                  // (the back of the sheet)

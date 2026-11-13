@@ -66,6 +66,7 @@ window.StoreTrees = (() => {
       if (x > 12 && x < 24 && z > -2 && z < 16) return false;           // next door
       if (SERVICE_ROAD.inside(x, z) || SERVICE_ROAD.inside(x - 1.4, z) || SERVICE_ROAD.inside(x + 1.4, z) || SERVICE_ROAD.inside(x, z - 1.4)) return false;   // inside the service road's fence (and none growing through it)
       if (Math.abs(z - SERVICE_ROAD.FRONT) < 1.4) return false;       // the fence's two runs along the back of the walk
+      if (EDGE.open.some(([a, b, c, d]) => x > a && x < b && z > c && z < d)) return false;   // the park across the road, the county's yard
       return !trees.some(t => Math.abs(t.x - x) < 1.3 && Math.abs(t.z - z) < 1.3);
     };
     const try1 = (x, z, s, pine) => { if (x > -60 && x < 70 && z > -24 && z < 88 && clear(x, z)) add(x, z, s, pine); };
@@ -76,7 +77,25 @@ window.StoreTrees = (() => {
       for (let i = 0; i < n; i++) { const a = R() * 6.28, d = Math.sqrt(R()) * r; try1(cx + Math.cos(a) * d, cz + Math.sin(a) * d, 0.9 + R() * 0.8, R() < (pine ? 0.8 : 0.2)); }
     }
     for (let i = 0; i < 40; i++) try1(-55 + R() * 120, -22 + R() * 105, 1 + R() * 0.7, R() < 0.4);   // on their own
-    for (const [x, z, s, pine] of SERVICE_ROAD.trees) { add(x, z, s, !!pine); trees[trees.length - 1].big = true; }   // the big ones just past the service road's fence, their tops over it
+    // the woods (EDGE, store/core.js): planted thick enough that there's no way through, bigger trees further in, right along the road as far as it can be seen
+    for (const [fx0, fx1, fz0, fz1, step] of EDGE.woods)
+      for (let x = fx0 + step / 2; x < fx1; x += step) for (let z = fz1 - step * 0.35; z > fz0; z -= step) {
+        const tx = x + (R() - 0.5) * step * 0.8, tz = z + (R() - 0.5) * step * 0.7; if (Math.abs(tz - SERVICE_ROAD.FRONT) < 1.4 || tz > fz1 - 0.3) continue;
+        const deep = Math.min(1, (fz1 - tz) / 7), s = R() < 0.35 + 0.3 * deep ? 1.8 + R() * 1.5 : 1 + R() * 0.8, pine = R() < 0.5;
+        add(tx, tz, s, pine); if (!pine && s > 2.3) trees[trees.length - 1].big = true;
+      }
+    // and the brush along their edge: what actually stops you. Two rows, the back one taller
+    const bushAt = [];
+    for (const [ax, az, bx, bz] of EDGE.brush) {
+      const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
+      let nx = -uz, nz = ux; { const mx = (ax + bx) / 2 + nx, mz = (az + bz) / 2 + nz; if (EDGE.open2(mx, mz)) { nx = -nx; nz = -nz; } }   // (n: away from the open side: never out onto the road or its walk)
+      for (let row = 0; row < 3; row++) for (let t = R() * 0.5; t < L; t += 0.8 + R() * 0.45) {
+        const x = ax + ux * t, z = az + uz * t; if (row && Math.abs(x) > 125) continue;   // (way down the road: one row does)
+        const d = row * 0.8 + R() * 0.35, h = 0.55 + R() * 0.4 + row * 0.38;
+        bushAt.push({ x: x + nx * d, z: z + nz * d, w: 0.7 + R() * 0.45 + row * 0.25, h, phase: R() * 6.28 });
+      }
+    }
+    for (const [x, z, s, pine] of [...SERVICE_ROAD.trees, ...EDGE.park.trees]) { add(x, z, s, !!pine); trees[trees.length - 1].big = true; }   // the big ones just past the service road's fence, their tops over it
 
     // the parts, counted up front
     const pines = trees.filter(t => t.pine), rounds = trees.filter(t => !t.pine);
@@ -125,6 +144,12 @@ window.StoreTrees = (() => {
       });
     });
     for (const o of [trunks, branches, cones]) o.instanceMatrix.needsUpdate = true;
+    { const bushes = inst(new THREE.IcosahedronGeometry(0.6, 0), swayMat({ color: 0xffffff }), bushAt.length), e = new THREE.Euler(), GREENS = [0x2f5a2c, 0x3a6a30, 0x2a4f2a, 0x46702f, 0x38592a];
+      bushAt.forEach((b, i) => {
+        put(bushes, i, { x: b.x, z: b.z, phase: b.phase, pine: true, s: 1.1 }, b.x, b.h * 0.42, b.z, b.w, b.h, b.w, new THREE.Quaternion().setFromEuler(e.set((R() - 0.5) * 0.5, R() * 6.28, (R() - 0.5) * 0.5)));
+        bushes.setColorAt(i, c.set(GREENS[i % GREENS.length]).offsetHSL((R() - 0.5) * 0.03, 0, (R() - 0.5) * 0.06));
+      });
+      bushes.instanceMatrix.needsUpdate = true; if (bushes.instanceColor) bushes.instanceColor.needsUpdate = true; }
 
     // leaves coming down: from the broadleaf canopies (and a share blown in high over the lot), tumbling, carried on the wind
     const NL = 2400, lp = new Float32Array(NL * 3), lc = new Float32Array(NL * 3), ls = new Float32Array(NL * 4), cols = [0xc23a1c, 0xe07a1e, 0xd8a12a, 0xb8642a, 0x8a4b22, 0xe0b52a].map(h => new THREE.Color(h));

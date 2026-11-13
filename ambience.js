@@ -189,7 +189,7 @@ window.StoreAmbience = (() => {
   }
   // a car going by on the road out front, left to right or right to left
   function car(night, o) {                        // (a random one tells store.js, so it can drive one past: onCarPass; o: store.js's own, { dir, v })
-    const t0 = ac.currentTime + 0.05, v = o?.v ?? 10 + Math.random() * 7, dir = o?.dir ?? (Math.random() < 0.5 ? 1 : -1), span = 70, dur = span / v, zRoad = dir > 0 ? -10.8 : -12.8;   // right-hand lanes
+    const t0 = ac.currentTime + 0.05, v = o?.v ?? 10 + Math.random() * 7, dir = o?.dir ?? (Math.random() < 0.5 ? 1 : -1), span = 220, dur = span / v, zRoad = dir > 0 ? -10.8 : -12.8;   // right-hand lanes
     if (!o) carSeen?.({ dir, v, z: zRoad, span });
     const p = panner(-dir * span / 2, 0.6, zRoad, 5, 1);
     p.positionX.setValueAtTime(-dir * span / 2, t0); p.positionX.linearRampToValueAtTime(dir * span / 2, t0 + dur);

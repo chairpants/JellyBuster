@@ -327,7 +327,7 @@ window.StoreAim = {
 function pickHover() {
   if (arcade.on) { $("hoverTip").style.display = "none"; highlight.visible = false; return; }   // (playing Space Invaders: nothing else to aim at)
   aimPostit = null; aimNotepad = false;
-  hovered = null; aimStool = false; aimPickup = null; aimTony = null; aimBed = false; aimFireExit = null; cm.comboOf = null; aimBlinds = null; aimSec = null; aimTV = false; aimLamp = null; aimCouch = false; aimReturns = false; aimSnack = null; aimFlap = null; aimCooler = false; aimPop = null; aimTrash = false; aimDoor = null; aimPOS = false; aimSlot = false; aimRewinder = null; aimBell = false; aimDesens = false; aimCutout = false; aimCustomer = false; aimLock = false; aimEmp = false; aimSwitch = null; aimDrawer = false; aimExit = false; aimPrinter = false; aimStockSlot = null; aimCupboard = null; aimBox = null; aimMess = null; aimStray = null; aimPhone = false; aimHolds = false; aimBoard = false; aimMove = null; aimToilet = false; aimSink = false; aimTowels = false; aimBin = null; aimBag = null; aimChute = false; aimTool = null; aimDead = null; aimLadder = false; aimLadderHome = false;
+  PARK.aim = null; hovered = null; aimStool = false; aimPickup = null; aimTony = null; aimBed = false; aimFireExit = null; cm.comboOf = null; aimBlinds = null; aimSec = null; aimTV = false; aimLamp = null; aimCouch = false; aimReturns = false; aimSnack = null; aimFlap = null; aimCooler = false; aimPop = null; aimTrash = false; aimDoor = null; aimPOS = false; aimSlot = false; aimRewinder = null; aimBell = false; aimDesens = false; aimCutout = false; aimCustomer = false; aimLock = false; aimEmp = false; aimSwitch = null; aimDrawer = false; aimExit = false; aimPrinter = false; aimStockSlot = null; aimCupboard = null; aimBox = null; aimMess = null; aimStray = null; aimPhone = false; aimHolds = false; aimBoard = false; aimMove = null; aimToilet = false; aimSink = false; aimTowels = false; aimBin = null; aimBag = null; aimChute = false; aimTool = null; aimDead = null; aimLadder = false; aimLadderHome = false;
   if (document.pointerLockElement !== canvas) { highlight.visible = false; $("hoverTip").style.display = "none"; return; }
   if (seated && seatAt?.office && !inspecting) {  // in the manager's chair: the switcher's in reach (see onE)
     highlight.visible = false; raycaster.setFromCamera(aimNDC, camera);
@@ -370,6 +370,7 @@ function pickHover() {
     tip.style.display = tip.innerHTML ? "block" : "none";
     return;
   }
+  { const tip = $("hoverTip"); if (parkAimTip(raycaster.ray, tip)) { highlight.visible = false; return; } }   // the park: the rocket's ladders, the swings, the seesaw (exterior/playground.js)
   {                                          // the ladder out back, from the ground: up it, if somebody's kicked it down
     const a = raycaster.intersectObject(roof.back.foot, false)[0], wall = a && raycaster.intersectObjects(aimBlockers, false)[0];
     if (a && a.distance < 2.6 && !(wall && wall.distance < a.distance)) {
