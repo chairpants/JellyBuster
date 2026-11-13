@@ -465,13 +465,13 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     scene.add(g);
     const spot = new THREE.SpotLight(0xffae4a, 0, 17, 1.05, 0.6, 1.5); spot.layers.set(EXTERIOR_LAYER);
     spot.position.set(x + nx * 0.3, y - 0.12, z + nz * 0.3); spot.target.position.set(x + nx * reach, 0, z + nz * reach); scene.add(spot, spot.target);
-    sodium.push({ lens, spot, delay: 0, full: 38 });
+    sodium.push({ lens, spot, delay: 0, full: 60, glow: 2.2, warm: 45 });   // (slower than the lot's: a dim red for a while, creeping up to full over most of a minute)
   };
   wallPack(9.5, 3.3, 35.1, 0, 1);            // the store's back wall, over the hammerhead and the back ladder
   wallPack(11.1, 2.95, 26.85, 1, 0, 5);      // the store's east wall, over the emergency exit and the dumpster
   wallPack(-7.84, 3.3, 16, -1, 0);           // the store's west wall, down the west lane
   wallPack(-7.84, 3.6, 43.2, -1, 0, 5);      // the theater's west wall, by the fire exit's stairwell
-  wallPack(-3, 4.6, 48.6, 0, 1, 7);          // the theater's back wall, out over the service road
+  wallPack(-5.4, 4.6, 48.6, 0, 1, 4);        // the theater's back wall, out over the service road (clear of the downspout at -3: SCUPPERS)
   wallPack(21, 3.3, 8, 1, 0);                // Tony's east wall, down the east lane
 
   // ornamental park lamp beside the bench: black wrought iron, stepped
@@ -563,12 +563,12 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     sodiumT += dt;
     let done = true;
     for (const s of sodium) {
-      const k = Math.min(1, Math.max(0, (sodiumT - s.delay) / SODIUM_WARM));
+      const k = Math.min(1, Math.max(0, (sodiumT - s.delay) / (s.warm ?? SODIUM_WARM)));
       if (k < 1) done = false;
       if (k <= 0) continue;                    // not struck yet
       const strike = k < 0.06 && Math.random() < 0.35 ? 0.3 : 1;   // a little sputter as it strikes
       s.spot.intensity = (s.full ?? 72) * k * k * strike;  // slow start, then climbs to full
-      s.lens.emissiveIntensity = 1.6 * (0.12 + 0.88 * k) * strike;
+      s.lens.emissiveIntensity = (s.glow ?? 1.6) * (0.12 + 0.88 * k) * strike;
       s.spot.color.copy(cold).lerp(warm, k); s.lens.emissive.copy(cold).lerp(warm, k);
     }
     if (done) sodiumT = null;
