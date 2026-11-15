@@ -82,14 +82,14 @@ const SERVICE_ROAD = (() => {
 // shelter stands on (pad: x0, x1, z0, z1), and a path from it up to the end of the store's walk (path: its x0, x1). every / at: on the hour,
 // a quarter past, from first to last (shift.h)
 const BUS = (() => {
-  const back = LOT.roadNear + 3.3, B = { in: 31.6, x0: 35.6, x1: 46, out: 50, back, z: (LOT.roadNear + back) / 2, lane: LOT.road[1], stop: 45.6, len: 11.6, wid: 2.5,
-    pad: [34.9, 46.6, back, back + 2.2], path: [34.9, 36.3], walkTo: STORE.x + 20, first: 6.25, last: 23.25 };
+  const back = LOT.roadNear + 3.3, B = { in: 31.6, x0: 43, x1: 60, out: 68, back, z: (LOT.roadNear + back) / 2, lane: LOT.road[1], stop: 57.2, len: 11.6, wid: 2.5,   // (a long taper in: room to pull over and straighten up)
+    pad: [44, 58.2, back, back + 2.2], path: [44, 45.4], walkTo: STORE.x + 20, first: 6.25, last: 23.25 };
   B.door = [B.stop - 1.35, back + 0.35];
   B.edge = x => x <= B.in || x >= B.out ? LOT.roadNear : x < B.x0 ? LOT.roadNear + 3.3 * (x - B.in) / (B.x0 - B.in) : x > B.x1 ? LOT.roadNear + 3.3 * (B.out - x) / (B.out - B.x1) : back;   // the bay's curb side at x
   return B;
 })();
 const EDGE = (() => {
-  const W = -30, E = 33.3, roadW = -46, roadE = 50, front = -12.9, far = -22.1, park = { x0: -20, x1: 26, z0: -40, trees: [[-15.5, -26.5, 3.6], [22.5, -37, 4.1], [-13, -37.6, 3.4, true], [23.8, -24.4, 3.2]] };   // (its big shade trees: x, z, size, pine)
+  const W = -30, E = 33.3, roadW = -46, roadE = 70, front = -12.9, far = -22.1, park = { x0: -20, x1: 26, z0: -40, trees: [[-15.5, -26.5, 3.6], [22.5, -37, 4.1], [-13, -37.6, 3.4, true], [23.8, -24.4, 3.2]] };   // (its big shade trees: x, z, size, pine)
   const inside = (x, z) => z >= front ? x > W && x < BUS.out + 0.4 : z >= far ? x > roadW && x < roadE : z > park.z0 && x > park.x0 && x < park.x1;   // (past the lot's east end, the bus stop and the grass round it)
   const SEE = 175;                                 // how far along the road the woods are kept up (past the walls, as far as you can see)
   // the woods: where they're planted thick ([x0, x1, z0, z1, spacing]), and the brush along their edge ([ax, az, bx, bz]: thickening away from the open side)

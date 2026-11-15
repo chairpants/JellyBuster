@@ -28,7 +28,7 @@ function buildBusStop({ lam, ext }) {
   flat(rect(B.path[0], B.path[1], pz1 - 0.05, -1.8), mat.sidewalk, 0.008);
   flat(rect(B.walkTo, B.path[1], -1.8, 0), mat.sidewalk, 0.008);
   // the shelter: posts, a roof, glass across the back and the west end, a lit ad at the east end, a bench, a strip light under the roof
-  const SX0 = 39.9, SX1 = 44.5, back = pz1 - 0.22, front = pz1 - 1.55, FRAME = 0x3a4650;
+  const SX0 = B.stop - 5.7, SX1 = B.stop - 1.1, back = pz1 - 0.22, front = pz1 - 1.55, FRAME = 0x3a4650;
   for (const x of [SX0, SX1]) for (const z of [back, front]) K.box(FRAME, 0.08, 2.4, 0.08, x, 1.2, z);
   K.box(0x2f3a42, SX1 - SX0 + 0.5, 0.08, back - front + 0.6, (SX0 + SX1) / 2, 2.44, (back + front) / 2 - 0.05, -0.05, 0, 0);   // the roof, falling to the front
   K.box(FRAME, SX1 - SX0, 0.06, 0.06, (SX0 + SX1) / 2, 2.35, back); K.box(FRAME, SX1 - SX0, 0.06, 0.06, (SX0 + SX1) / 2, 0.12, back);
@@ -72,14 +72,15 @@ function buildBusStop({ lam, ext }) {
 }
 // ---- the bus itself: an old transit bus, cream with a blue and red stripe, its route on the sign over the windshield. Built nose along +x
 // (like the cars: exterior/lot.js), the doors on its right (+z), the curb side going east ----
-const bus = { g: null, phase: "off", slot: null, path: null, len: 1, u: 0, v: 0, t: 0, doors: 0, doorsTo: 0, parts: null, col: null, off: [], drops: 0, boarding: new Set() };
+const BUS_AXLE = { front: 3.6, rear: -3.1 };    // where its axles are, from its middle along it (the wheelbase between them)
+const bus = { g: null, front: new THREE.Vector2(), rear: new THREE.Vector2(), phase: "off", slot: null, path: null, len: 1, u: 0, v: 0, t: 0, doors: 0, doorsTo: 0, parts: null, col: null, off: [], drops: 0, boarding: new Set() };
 function busMesh() {
   const g = new THREE.Group(), K = outdoorKit(), L = BUS.len, W = BUS.wid, H = 3.0, CREAM = 0xe9e2c6;
   K.box(CREAM, L, 1.0, W, 0, 0.85, 0); K.box(CREAM, L, 0.6, W, 0, 2.65, 0); K.box(0xdcd5b9, L - 0.3, 0.06, W - 0.3, 0, H - 0.02, 0);
   K.box(0x1f5fa8, L + 0.02, 0.12, W + 0.02, 0, 1.28, 0); K.box(0xb3322a, L + 0.02, 0.08, W + 0.02, 0, 1.12, 0);
   for (const s of [-1, 1]) K.box(0x16181b, 0.18, 0.28, W + 0.04, s * (L / 2 + 0.02), 0.42, 0);   // the bumpers
   for (const [x, ry] of [[L / 2 - 0.12, 0], [-L / 2 + 0.12, Math.PI]]) for (const z of [-0.85, 0.85]) K.box(0xd8d4c4, 0.06, 0.2, 0.34, x + Math.cos(ry) * 0.12, 0.75, z);   // lamp housings
-  for (const s of [-1, 1]) for (const x of [3.6, -3.1]) { K.cyl(0x141414, 0.5, 0.5, 0.3, x, 0.5, s * (W / 2 - 0.12), 18, Math.PI / 2); K.cyl(0x9a9ea2, 0.26, 0.26, 0.32, x, 0.5, s * (W / 2 - 0.11), 12, Math.PI / 2); }
+  for (const s of [-1, 1]) { K.cyl(0x141414, 0.5, 0.5, 0.3, BUS_AXLE.rear, 0.5, s * (W / 2 - 0.12), 18, Math.PI / 2); K.cyl(0x9a9ea2, 0.26, 0.26, 0.32, BUS_AXLE.rear, 0.5, s * (W / 2 - 0.11), 12, Math.PI / 2); }   // (the back wheels: fixed)
   K.box(0x0d0f12, 0.4, 0.25, W - 0.2, 0, 0.32, 0);   // (under it, dark)
   g.add(K.mesh());
   // the glass all round, its own material: lit from inside after dark
@@ -100,7 +101,10 @@ function busMesh() {
   for (const cx of [L / 2 - 1.35, -0.6]) for (const s of [-1, 1]) {
     const lf = new THREE.Mesh(new THREE.BoxGeometry(0.52, 2.35, 0.05), leafM); lf.position.set(cx + s * 0.27, 1.5, W / 2 + 0.01); lf.userData = { x: cx + s * 0.27, s }; g.add(lf); leaves.push(lf);
   }
-  bus.parts = { glass, head, tail, leaves };
+  const steer = [];                                // the front wheels: each on its own kingpin, turned by busPlace
+  for (const s of [-1, 1]) { const kp = new THREE.Group(); kp.position.set(BUS_AXLE.front, 0.5, s * (W / 2 - 0.12)); g.add(kp); steer.push(kp);
+    const KW = outdoorKit(); KW.cyl(0x141414, 0.5, 0.5, 0.3, 0, 0, 0, 18, Math.PI / 2); KW.cyl(0x9a9ea2, 0.26, 0.26, 0.32, 0, 0, s * 0.01, 12, Math.PI / 2); kp.add(KW.mesh()); }
+  bus.parts = { glass, head, tail, leaves, steer };
   return g;
 }
 // ---- the run ----
@@ -120,18 +124,30 @@ function busToSpot(w) {                            // to the first free spot, an
 }
 const BUS_UP = () => [[BUS.door[0], BUS.back + 1.0], [BUS.path[0] + 0.7, BUS.back + 1.0], [BUS.path[0] + 0.7, SIDEWALK_Z], [BUS.walkTo, SIDEWALK_Z]];   // from the door, up the path to the walk
 const busOutsidePath = () => [BUS.door, ...BUS_UP(), OUTSIDE_IN];   // (store/shoppers.js) off the bus and up to the store's door
+// How it drives: the path is where its front axle goes, and the front wheels steer it there; the back axle just follows, dragged along behind
+// at the wheelbase (so the back cuts in on a turn, and the body swings round from the back wheels, not its middle). Pulling in, a long easy
+// S off the lane into the bay, then straight on up it to straighten out; pulling out, the same back into the lane
+const busCurve = pts => new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
+const busS = (x0, z0, x1, z1, n = 14) => Array.from({ length: n + 1 }, (_, i) => { const k = i / n; return [x0 + (x1 - x0) * k, z0 + (z1 - z0) * k * k * (3 - 2 * k)]; });   // an even S from one line to another
+const busStopF = () => busBay() + BUS_AXLE.front;   // where the front axle stops
 function busStart() {
-  const z = BUS.z, Ln = BUS.lane, sc = busBay();
-  bus.path = new THREE.CatmullRomCurve3([[-110, Ln], [BUS.in - 30, Ln], [BUS.in - 6, Ln], [BUS.in + 1.5, Ln + 1.3], [BUS.x0 + 1, z - 0.15], [BUS.x0 + 4, z], [sc, z]].map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
+  const Ln = BUS.lane, f0 = -110;
+  bus.path = busCurve([[f0, Ln], [BUS.in - 30, Ln], ...busS(BUS.in - 3, Ln, BUS.x0 + 1, BUS.z), [busStopF(), BUS.z]]);
   bus.len = bus.path.getLength(); bus.u = 0; bus.v = 11; bus.phase = "approach"; bus.g.visible = true; bus.drops = 0; busRiders();
+  bus.front.set(f0, Ln); bus.rear.set(f0 - (BUS_AXLE.front - BUS_AXLE.rear), Ln);
   busPlace(); window.StoreAmbience?.drive?.(1, 13);
 }
-function busPlace() {                              // on its path at u, nose along it
-  const p = bus.path.getPointAt(bus.u), q = bus.path.getPointAt(Math.min(1, bus.u + 0.002)), r = bus.path.getPointAt(Math.max(0, bus.u - 0.002));
-  bus.g.position.set(p.x, LOT.y, p.z); bus.g.rotation.y = Math.atan2(-(q.z - r.z), q.x - r.x);
-  const c = Math.abs(Math.cos(bus.g.rotation.y)), s = Math.abs(Math.sin(bus.g.rotation.y)), hx = BUS.len / 2 * c + BUS.wid / 2 * s, hz = BUS.len / 2 * s + BUS.wid / 2 * c;
+function busPlace() {                              // the front axle to its point on the path at u; the back one trails it; the body between them
+  const p = bus.path.getPointAt(bus.u), WB = BUS_AXLE.front - BUS_AXLE.rear;
+  bus.front.set(p.x, p.z);
+  const d = bus.front.clone().sub(bus.rear), L = d.length() || 1; d.multiplyScalar(1 / L); bus.rear.copy(bus.front).addScaledVector(d, -WB);   // (dragged along behind)
+  const ry = Math.atan2(-d.y, d.x), cx = bus.rear.x + d.x * -BUS_AXLE.rear, cz = bus.rear.y + d.y * -BUS_AXLE.rear;
+  bus.g.position.set(cx, LOT.y, cz); bus.g.rotation.y = ry;
+  const t = bus.path.getTangentAt(Math.min(0.999, bus.u)), steer = Math.atan2(Math.sin(Math.atan2(-t.z, t.x) - ry), Math.cos(Math.atan2(-t.z, t.x) - ry));   // the front wheels: the way the path goes, against the way the bus points
+  for (const kp of bus.parts.steer) kp.rotation.y += (Math.max(-0.6, Math.min(0.6, steer)) - kp.rotation.y) * 0.35;
+  const c = Math.abs(Math.cos(ry)), s = Math.abs(Math.sin(ry)), hx = BUS.len / 2 * c + BUS.wid / 2 * s, hz = BUS.len / 2 * s + BUS.wid / 2 * c;
   if (!bus.col) { bus.col = { x0: 0, x1: 0, z0: 0, z1: 0 }; colliders.push(bus.col); }
-  Object.assign(bus.col, { x0: p.x - hx, x1: p.x + hx, z0: p.z - hz, z1: p.z + hz });   // (it's in the way: nobody walks through a bus)
+  Object.assign(bus.col, { x0: cx - hx, x1: cx + hx, z0: cz - hz, z1: cz + hz });   // (it's in the way: nobody walks through a bus)
 }
 function busGone() { bus.phase = "off"; bus.g.visible = false; if (bus.col) { colliders.splice(colliders.indexOf(bus.col), 1); bus.col = null; } }
 function busTick(dt) {
@@ -175,7 +191,7 @@ function busTick(dt) {
     if (bus.t > 60) { bus.off.length = 0; bus.doorsTo = 0; if (bus.doors <= 0) bus.phase = "gap"; }   // (it won't wait forever)
   } else if (bus.phase === "gap") {                // a look back down the lane for a gap, then out
     if ((carsOut?.lane?.(1) || []).some(p => p.x > sc - 40 && p.x < sc + 8)) return;
-    bus.path = new THREE.CatmullRomCurve3([[sc, BUS.z], [BUS.x1 - 1, BUS.z], [BUS.out - 0.5, BUS.lane + 1.0], [BUS.out + 7, BUS.lane], [BUS.out + 30, BUS.lane], [110, BUS.lane]].map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
+    bus.path = busCurve([[busStopF(), BUS.z], ...busS(BUS.x1 - 1.5, BUS.z, BUS.out + 3, BUS.lane), [BUS.out + 30, BUS.lane], [110, BUS.lane]]);
     bus.len = bus.path.getLength(); bus.u = 0; bus.v = 0; bus.phase = "leave"; window.StoreAmbience?.drive?.(1, 9);
   } else if (bus.phase === "leave") {
     bus.v = carsOut?.ahead?.(bus.g, bus.v) ? Math.max(0, bus.v - 8 * dt) : Math.min(11, bus.v + 1.3 * dt);
