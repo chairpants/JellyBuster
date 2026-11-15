@@ -286,7 +286,7 @@ renderer.setAnimationLoop(() => {
     });
     m.mesh.instanceColor.needsUpdate = true;
   }
-  exteriorTick(dt); weatherTick(dt); walkerTick(dt); decorTick(dt);
+  exteriorTick(dt); weatherTick(dt); walkerTick(dt); busTick(dt); parkgoerTick(dt); decorTick(dt);
   if (!playing) updateScreensaver(dt);
   if (!playing && !video.paused) video.pause();   // (no tape in, nothing to hear: whatever got the video going after it came out, it stops here)
   if (playing || tvMenu) updateVideoFrame();

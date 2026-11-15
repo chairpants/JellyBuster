@@ -2,13 +2,14 @@
 // Called from the roof's block (store/roof.js), with the helpers of its it uses.
 function buildGrounds({ lam, put, bx, cy, ext, dark }) {
   const ground = (x0, x1, z0, z1, m, y = 0) => { const g = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), m); g.rotation.x = -Math.PI / 2; g.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); scene.add(g); ext(g); };
-  for (const [x0, x1, z0, z1] of [[-250, -27.74, LOT.roadNear, 0], [31, 250, LOT.roadNear, 0], [-250, -27.74, -250, LOT.roadFar], [31, 250, -250, LOT.roadFar], [-27.74, 31, -250, -30.4],   // (out front: round the road, which runs on out of sight)
+  for (const [x0, x1, z0, z1] of [[-250, -27.74, LOT.roadNear, 0], [31, 250, BUS.back, 0], [31, BUS.in, LOT.roadNear, BUS.back], [BUS.out, 250, LOT.roadNear, BUS.back], [-250, -27.74, -250, LOT.roadFar], [31, 250, -250, LOT.roadFar], [-27.74, 31, -250, -30.4],   // (out front: round the road, which runs on out of sight)
     [-250, -9.4, 0, 250], [-9.4, -7.84, 0, FIRE_EXIT.well.z0 - 0.15], [-9.4, -7.84, FIRE_EXIT.well.z1, 250], [11.1, 250, 0, 250],   // (round the emergency exit's stairwell)
     [2.1, 11.1, 35.1, 48.6], [-7.84, 11.1, 48.6, 250]]) ground(x0, x1, z0, z1, mat.grass);   // (none under the building: the theater's floor goes down below it)
   { const n = weatheredSign("EMERGENCY EXIT\nNO ENTRY", 0.62, 0.26, { fg: "#f2f2ee", bg: "#a81a1c", seed: 91, bent: 0.008 }); n.position.set(0.024, 1.5, -storeExit.w / 2); n.rotation.y = Math.PI / 2; n.layers.set(EXTERIOR_LAYER); storeExit.leaf.add(n); }   // the notice on the store's emergency exit
   buildServiceRoad({ lam, ext });                  // the service road: its paving, fence, barriers
   buildEdges({ lam, ext });                        // out front, where the world stops: the county's yard and its fence, the power line (exterior/edges.js)
   buildPlayground({ lam, ext });                   // the park across the road (exterior/playground.js)
+  buildBusStop({ lam, ext });                       // the bus's bay past the shops, the stop and its shelter (exterior/bus.js)
   for (const [x, z, seed, tilt] of [[-16.38, 0.42, 51, 0.022], [22.45, 0.4, 67, -0.03]]) {   // a sign at each way in
     const s = new THREE.Group(); scene.add(s); cy(0.03, 0.03, 2.2, lam(0x6a6e70), x, 1.1, z, 8, s);
     bx(1.15, 0.42, 0.012, lam(0x5e6264), x, 2.0, z - 0.034, s).rotation.z = tilt;                                  // (the back of the sheet)

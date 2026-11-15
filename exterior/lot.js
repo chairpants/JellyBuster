@@ -266,6 +266,8 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     swerve: (m, away) => { if (!m.sw && !m.crash) m.sw = { t: 0, T: 1.3, A: away * 1.1 }; },   // away: +1 toward the store, -1 away from it
     crash: m => { m.sw = null; m.crash = { st: "off", t: 0, z1: m.v0 > 0 ? LOT.roadNear + 0.6 : LOT.roadFar - 0.8 }; },   // to its right: the lot's curb, or the grass over the road
   };
+  carsOut.ahead = (g, speed) => carAhead(g, speed);   // (the bus keeps out of the cars too)
+  carsOut.lane = dir => movers.filter(m => Math.sign(m.v0) === dir && !m.crash).map(m => m.g.position);   // where the cars going by are, in that lane
   carNew = () => ({ s: Math.floor(Math.random() * STYLES.length), c: PAINT[Math.floor(Math.random() * PAINT.length)] });
   passCar = ({ dir, v }) => roadPass(carNew(), dir, v);
   // a customer's own car: along the road, slowing, and in at the driveway on its side of the lot (east-bound at the west
@@ -371,7 +373,12 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     }
   };
 
-  eb(LOT.drives[1][0] - LOT.drives[0][1], CURB_H, 0.15, mat.curb, (LOT.drives[0][1] + LOT.drives[1][0]) / 2, CURB_Y, lotFar);   // the curb along the road side, between the driveways
+  for (const [a, b] of [[LOT.drives[0][1], CROSS.x - CROSS.w / 2], [CROSS.x + CROSS.w / 2, LOT.drives[1][0]]]) eb(b - a, CURB_H, 0.15, mat.curb, (a + b) / 2, CURB_Y, lotFar);   // the curb along the road side, between the driveways (but for the crosswalk's gap)
+  { const X = CROSS.x, hw = CROSS.w / 2;           // the crosswalk: concrete over the verge, the stripes across the road, the stall it comes down hatched off
+    const flat = (w, d, m, x, y, z, ry = 0) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), m); p.rotation.set(-Math.PI / 2, 0, ry); p.position.set(x, y, z); return ea(p); };
+    flat(CROSS.w, lotFar - LOT.roadNear, mat.sidewalk, X, 0.006, (lotFar + LOT.roadNear) / 2);
+    for (let z = LOT.roadNear - 0.45; z > roadFar + 0.3; z -= 0.9) flat(CROSS.w - 0.2, 0.45, mat.lineWhite, X, LOT.y + 0.003, z);
+    for (let k = 0; k < 6; k++) flat(0.12, 2.4, mat.lineWhite, X, LOT.y + 0.003, driveTo - 0.6 - k * 0.75, Math.PI / 4); }   // (hatched: no parking)
   // the lot's ends and its edge along the walk curbed too, its corners at the walk rounded off (grass in the corner, the curb round it)
   { const Rs = 1.5, zw = -SIDEWALK;
     for (const [ex, sd] of [[lx0, 1], [lx1, -1]]) {
@@ -399,7 +406,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
     } }
   const ROAD_X = 250;                                     // the road behind the lot, out both ways past where the eye (and the fog) gives out
   { const r = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_X * 2, LOT.roadNear - roadFar), mat.road); r.rotation.x = -Math.PI / 2; r.position.set(0, LOT.y, (LOT.roadNear + roadFar) / 2); ea(r);
-    const R = lotFar - LOT.roadNear, hw = LOT.gateW / 2, cuts = [-ROAD_X, ...LOT.drives.flatMap(([a, b]) => [a - R, b + R]), ROAD_X];   // curbs along both edges of the road (not across the driveways)
+    const R = lotFar - LOT.roadNear, hw = LOT.gateW / 2, cuts = [-ROAD_X, ...LOT.drives.flatMap(([a, b]) => [a - R, b + R]), BUS.in, BUS.out, ROAD_X];   // curbs along both edges of the road (not across the driveways, or the bus's bay: its own's along its back)
     for (let i = 0; i < cuts.length; i += 2) eb(cuts[i + 1] - cuts[i], CURB_H, 0.15, mat.curb, (cuts[i] + cuts[i + 1]) / 2, CURB_Y, LOT.roadNear + 0.075);
     eb(ROAD_X * 2, CURB_H, 0.15, mat.curb, 0, CURB_Y, roadFar - 0.075); }
   { const n = Math.floor(ROAD_X * 2 / 1.7), dg = new THREE.PlaneGeometry(0.9, 0.12); dg.rotateX(-Math.PI / 2);   // dashed centerline
@@ -533,11 +540,12 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   const SODIUM_WARM = 5, cold = new THREE.Color(0xff4d1a), warm = new THREE.Color(0xffae4a);
   exteriorTick = dt => {
     traffic = [...movers.filter(m => m.crash?.st !== "sat").map(m => ({ g: m.g, id: m.id, back: false })),
-      ...lotCars.filter(c => c.g && LOT_MOVING.has(c.phase)).map(c => ({ g: c.g, id: c.id, back: c.phase === "backOut" }))];
+      ...lotCars.filter(c => c.g && LOT_MOVING.has(c.phase)).map(c => ({ g: c.g, id: c.id, back: c.phase === "backOut" })), ...busTraffic()];   // (the bus: exterior/bus.js)
     for (let i = movers.length - 1; i >= 0; i--) {   // the cars going by
       const m = movers[i], p = m.g.position, dir = Math.sign(m.v0);
       let vz = 0;
-      if (!m.crash && !m.sw) m.vx = carAhead(m.g, m.vx) ? dir * Math.max(0, Math.abs(m.vx) - 12 * dt) : dir * Math.min(Math.abs(m.v0), Math.abs(m.vx) + 5 * dt);   // (slowing behind somebody, back up to speed after)
+      if (!m.crash && !m.sw) m.vx = carAhead(m.g, m.vx) ? dir * Math.max(0, Math.abs(m.vx) - 12 * dt) : dir * Math.min(Math.abs(m.v0), Math.abs(m.vx) + 5 * dt);
+      if (!m.crash && !m.sw) { const d = (CROSS.x - p.x) * dir - 4.4; if (d > -0.3 && d < 30 && crossBusy()) m.vx = dir * Math.min(Math.abs(m.vx), Math.sqrt(Math.max(0, 2 * 5.5 * d))); }   // somebody on the crosswalk: stop short of it (exterior/parkgoers.js)   // (slowing behind somebody, back up to speed after)
       if (m.crash) {                                 // off the road: braking hard onto the shoulder, sat there on its hazards, then away again
         const c = m.crash; c.t += dt;
         if (c.st === "off") {

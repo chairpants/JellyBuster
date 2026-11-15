@@ -1071,6 +1071,7 @@ window.StoreCustomers = (() => {
       // opts.lean: false = arm only (counter work: no bowing; out-of-reach just points the arm)
       reachTo(point, arm = 1, opts = {}) { if (point) { reach.target.copy(point); reach.on = true; reach.arm = arm; reach.lean = opts.lean !== false; } else reach.on = false; },
       reachAlso(point, arm = 0) { if (point) { reach2.target.copy(point); reach2.on = true; reach2.arm = arm; } else reach2.on = false; },
+      get reaching() { return [reach.on ? reach : null, reach2.on ? reach2 : null]; },   // where the hands are going ({ target, arm, lean }), for the other player's copy
       talk(on) { talking = on; },                    // chatting across the counter: small nods and tilts
       get gait() { return gait; }, set gait(g) { gait = GAITS[g] ? g : "plain"; },
       setWind(wx, wz) { env.wx = wx; env.wz = wz; },  // the wind on them, world m/s (the way the air's going): they lean into it, and it leans on them

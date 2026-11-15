@@ -90,8 +90,24 @@ function custArriveByCar(cust) {
   cust.car = car; cust.c.group.visible = false; cust.c.group.position.set(0, 0, -40); cust.state = "drivingIn";
   return true;
 }
-// arriving with someone: in the same car, or up the sidewalk a step behind them
+// who takes the bus (exterior/bus.js): decided the first time they come in, the ones who don't drive, and kept on their record (m.bus). On it,
+// they're out of sight till it's in; then off at its door and up the path to the walk, and in. Done, they go back down to the stop to wait
+function custArriveByBus(cust) {
+  const m = cust.member; if (m.bus === undefined) m.bus = !m.car && Math.random() < 0.45;
+  if (!m.bus || !busComing(1.2)) return false;
+  custOnBus(cust); return true;
+}
+function custOnBus(cust, step = 0) {               // on the next bus: off it at the door when it's in (step: a moment behind whoever they're with)
+  cust.bus = true; cust.c.group.visible = false; cust.c.group.position.set(0, 0, -40); cust.state = "onBus";
+  busRide(() => {
+    if (cust.state !== "onBus" || !cust.c) return false;
+    const out = cust.outside = busOutsidePath(); cust.c.group.visible = true; cust.c.group.position.set(out[0][0] + step, 0, out[0][1]);
+    cust.path = [...out.slice(1), INSIDE_DOOR, [CUST_DOOR.x, CUST_DOOR.z]]; cust.state = "arrive"; cust.spot = CUST_DOOR; return true;
+  });
+}
+// arriving with someone: in the same car or on the same bus, or up the sidewalk a step behind them
 function custRideWith(cust, lead) {
+  if (lead.state === "onBus") return custOnBus(cust, -0.6);
   if (lead.car && lead.state === "drivingIn") {
     lead.car.riders.add(cust); cust.car = lead.car;
     cust.c.group.visible = false; cust.c.group.position.set(0, 0, -40); cust.state = "drivingIn"; return;
@@ -261,7 +277,7 @@ function custSpawn(member = custPickMember(true), opts = {}) {   // opts.kid: a 
   c.setMood("on"); c.setPose(cust.returning.length ? "hold" : "idle"); c.holdTape(Math.min(3, cust.returning.length));
   Object.assign(cust, { tagged: false, alarmed: false, holding: 0, tapes: [], snacks: [], snackDone: false, seen: new Set(), stopsLeft: who.persona.stops, path: [], spot: null, state: "boot", t: 0.6 });   // screen warms up, then in they come
   if (opts.ride) custRideWith(cust, opts.ride);   // with someone: in their car, or walking up beside them
-  else if (!custArriveByCar(cust)) {              // ...from out front: their car, or up the sidewalk; to the door and in
+  else if (!custArriveByCar(cust) && !custArriveByBus(cust)) {   // ...from out front: their car, the bus, or up the sidewalk; to the door and in
     const out = cust.outside = outsidePath();
     c.group.position.set(out[0][0], 0, out[0][1]); cust.path = [...out.slice(1), INSIDE_DOOR, [CUST_DOOR.x, CUST_DOOR.z]]; cust.state = "arrive"; cust.spot = CUST_DOOR;
   }
@@ -476,6 +492,11 @@ function pizzaRun() {                             // someone getting a pizza: by
     }, PIZZA_DOOR[0]);
     if (car) { car.idling = Math.random() < 0.2; window.StoreAmbience?.drive?.(car.dir, 13); return; }
   }
+  if (Math.random() < 0.35 && busComing(1)) {      // on the bus: off at the stop, up to next door, and back down to wait for the next one with the box
+    busRide(() => { walkerMake([BUS.door, ...BUS_UP().slice(0, 3), [PIZZA_DOOR[0], SIDEWALK_Z], PIZZA_DOOR], w => walkerInTonys(w, wait, () => {
+      w.path = [[PIZZA_DOOR[0], SIDEWALK_Z], [BUS.path[0] + 0.7, SIDEWALK_Z]]; w.then = w => busToSpot(w); })); return true; });
+    return;
+  }
   const from = (Math.random() < 0.5 ? -1 : 1) * 24;   // on foot, up the sidewalk
   walkerMake([[from, SIDEWALK_Z - Math.random() * 0.3], [PIZZA_DOOR[0], SIDEWALK_Z], PIZZA_DOOR], w => walkerInTonys(w, wait, () => {
     w.path = [[PIZZA_DOOR[0], SIDEWALK_Z], [from > 0 ? -24 : 24, SIDEWALK_Z]]; w.then = walkerGone;
@@ -485,7 +506,7 @@ function walkerTick(dt) {
   const h = shift.h, night = h < 7 || h > 21.5;
   if (started && (walkerAt.t -= dt) <= 0) {        // somebody going by
     walkerAt.t = (night ? 70 + Math.random() * 120 : 18 + Math.random() * 40) * (WX.k > 0.3 ? 1.8 : 1);
-    if (walkers.length < 4 && h > 6.5) { const dir = Math.random() < 0.5 ? 1 : -1, z = SIDEWALK_Z - Math.random() * 0.4; walkerMake([[-dir * 24, z], [dir * 24, z]], walkerGone); }
+    if (walkers.length < 4 && h > 6.5 && !(Math.random() < 0.3 && busCatcher())) { const dir = Math.random() < 0.5 ? 1 : -1, z = SIDEWALK_Z - Math.random() * 0.4; walkerMake([[-dir * 24, z], [dir * 24, z]], walkerGone); }   // (or off down to the bus stop)
   }
   const open = h >= 11 && h < 23, busy = (h > 11.5 && h < 13.5) || (h > 17 && h < 20.5);
   if (started && open && (walkerAt.pizzaT -= dt) <= 0) { walkerAt.pizzaT = (busy ? 25 : 70) + Math.random() * (busy ? 40 : 110); if (walkers.length < 5) pizzaRun(); }
@@ -556,9 +577,9 @@ function custBumps(cust, p, dx, dz, dt) {
   return true;
 }
 function custGo(cust, state, spot, avoidPlayer = false) {   // head for a spot; state is what to do on arrival
-  if (cust.state === "drivingIn" || cust.c.group.position.z < 0.3) {   // still in the car, or out front: no finding a way out there. Sent off, they just turn back
+  if (cust.state === "drivingIn" || cust.state === "onBus" || cust.c.group.position.z < 0.3) {   // still in the car (or on the bus), or out front: no finding a way out there. Sent off, they just turn back
     if (state !== "leave" || cust.state === "outside") return;
-    if (cust.state === "drivingIn") return custGone(cust);
+    if (cust.state === "drivingIn" || cust.state === "onBus") return custGone(cust);
     cust.path = (cust.outside || [OUTSIDE_IN]).slice(0, -1).reverse(); cust.state = "outside"; return;
   }
   if (state === "leave") custLeaveLine(cust);
@@ -668,8 +689,8 @@ function custGone(cust) {
     logAct(`${cust.known ? memberName(cust.member) : "Someone"} walked out with ${what}: stolen`, "bad", null, -75 * cust.tapes.length);
   }   // walked out with them: gone for good (order a replacement on the POS)
   if (cust.car) { cust.car.riders?.delete(cust); if (!cust.car.riders?.size) driveOut(cust.car); }   // back in the car, and off once everyone's in (or, not parked yet: just gone)
-  const c = cust.c;
-  c.group.removeFromParent(); c.dispose();
+  const c = cust.c, toBus = cust.bus && c.group.visible && c.group.position.z < -5 && busWaitWith(c);   // down at the stop: they wait for it (exterior/bus.js)
+  if (!toBus) { c.group.removeFromParent(); c.dispose(); }
   for (const m of c.parts) { const i = aimables.indexOf(m); if (i >= 0) aimables.splice(i, 1); }
   colliders.splice(colliders.indexOf(cust.box), 1);
   custs.splice(custs.indexOf(cust), 1);
@@ -991,7 +1012,7 @@ function custStep(cust, dt) {
     switch (cust.state) {
       case "repath": if (cust.t <= 0) custGo(cust, cust.repath.state, cust.repath.spot); break;
       case "arrive": cust.state = "boot"; cust.t = 0; break;   // in the door
-      case "drivingIn": break;                    // (on their way, in the car)
+      case "drivingIn": case "onBus": break;      // (on their way, in the car or on the bus)
       case "outside": c.setMood("off"); custGone(cust); return;   // back to their car (or off up the sidewalk)
       case "signedUp": if (cust.t <= 0) { c.holdProp(null); c.setPose("idle"); cust.stopsLeft > 0 ? custNextStop(cust) : custGo(cust, "leave", CUST_DOOR); } break;   // card in hand: now to look around
       case "caught": {                            // caught red-handed: facing you, waiting to hear what happens
@@ -1156,7 +1177,8 @@ function custStep(cust, dt) {
       case "paid": if (cust.t <= 0) { c.setMood("happy"); if (custPartners(cust).length) custTagAlong(cust); else custGo(cust, "leave", CUST_DOOR); } break;   // (paid up, but the others aren't done)
       case "tagAlong": custTagAlongTick(cust); break;
       case "chat": if (cust.t <= 0) { c.talk(false); c.lookAt(null); cust.chatting = null; cust.state = "browse"; cust.t = 0.5 + Math.random(); } break;
-      case "leave": cust.path = [INSIDE_DOOR, ...(cust.outside || [OUTSIDE_IN]).slice().reverse()]; cust.state = "outside"; break;   // out the door, back the way they came
+      case "leave": if (cust.bus && !busComing(1.5)) { cust.bus = false; cust.outside = outsidePath(); }   // (came on the bus, and there's no bus home tonight: they walk)
+        cust.path = [INSIDE_DOOR, ...(cust.outside || [OUTSIDE_IN]).slice().reverse()]; cust.state = "outside"; break;   // out the door, back the way they came
       case "out": if (cust.t <= 0) { window.StoreAmbience?.chime(CUST_DOOR.x, 2.3, 0.2, heardFrom(CUST_DOOR.x, 0.2, false)); custGone(cust); } return;
     }
   }

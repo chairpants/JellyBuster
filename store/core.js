@@ -76,28 +76,46 @@ const SERVICE_ROAD = (() => {
 // the edges of the world out front: what you can walk on this side of the fence. The lot and its walk between the county's road yard (chain-link, west)
 // and the woods (east); the road and both its verges, which run on out of sight (roadW / roadE: where you can't follow them any further, nothing there
 // but more road); and the park across it, a clearing in the trees. Everything past these lines is brush, fence or forest: see exterior/edges.js, trees.js
+// the bus: a bay past the shops, east of the lot, pulled in off the store side's lane (eastbound) so it stops out of the traffic. in: where
+// its taper starts off the lane, x0: full width; x1: where it starts back, out: back in the lane. back: the bay's curb side; z: down its middle.
+// stop: where the bus's nose pulls up to, door: where you get on and off (its front door, on the curb side). Behind the curb, the pad the
+// shelter stands on (pad: x0, x1, z0, z1), and a path from it up to the end of the store's walk (path: its x0, x1). every / at: on the hour,
+// a quarter past, from first to last (shift.h)
+const BUS = (() => {
+  const back = LOT.roadNear + 3.3, B = { in: 31.6, x0: 35.6, x1: 46, out: 50, back, z: (LOT.roadNear + back) / 2, lane: LOT.road[1], stop: 45.6, len: 11.6, wid: 2.5,
+    pad: [34.9, 46.6, back, back + 2.2], path: [34.9, 36.3], walkTo: STORE.x + 20, first: 6.25, last: 23.25 };
+  B.door = [B.stop - 1.35, back + 0.35];
+  B.edge = x => x <= B.in || x >= B.out ? LOT.roadNear : x < B.x0 ? LOT.roadNear + 3.3 * (x - B.in) / (B.x0 - B.in) : x > B.x1 ? LOT.roadNear + 3.3 * (B.out - x) / (B.out - B.x1) : back;   // the bay's curb side at x
+  return B;
+})();
 const EDGE = (() => {
   const W = -30, E = 33.3, roadW = -46, roadE = 50, front = -12.9, far = -22.1, park = { x0: -20, x1: 26, z0: -40, trees: [[-15.5, -26.5, 3.6], [22.5, -37, 4.1], [-13, -37.6, 3.4, true], [23.8, -24.4, 3.2]] };   // (its big shade trees: x, z, size, pine)
-  const inside = (x, z) => z >= front ? x > W && x < E : z >= far ? x > roadW && x < roadE : z > park.z0 && x > park.x0 && x < park.x1;
+  const inside = (x, z) => z >= front ? x > W && x < BUS.out + 0.4 : z >= far ? x > roadW && x < roadE : z > park.z0 && x > park.x0 && x < park.x1;   // (past the lot's east end, the bus stop and the grass round it)
   const SEE = 175;                                 // how far along the road the woods are kept up (past the walls, as far as you can see)
   // the woods: where they're planted thick ([x0, x1, z0, z1, spacing]), and the brush along their edge ([ax, az, bx, bz]: thickening away from the open side)
   const woods = [[-115, park.x0 - 1.6, -36, far - 1.2, 2.5], [park.x1 + 1.6, 115, -36, far - 1.2, 2.5], [-SEE, -115, -29, far - 1.2, 2.7], [115, SEE, -29, far - 1.2, 2.7],
     [park.x0 - 16, park.x1 + 16, -52, park.z0 - 1.4, 2.5], [park.x0 - 16, park.x0 - 1.6, park.z0 - 1.4, -36, 2.5], [park.x1 + 1.6, park.x1 + 16, park.z0 - 1.4, -36, 2.5],
-    [E + 1.3, 115, front + 0.9, -1.2, 2.5], [115, SEE, front + 0.9, -6, 2.7], [-115, -59.5, front + 0.9, -1.2, 2.5], [-SEE, -115, front + 0.9, -6, 2.7]];
+    [BUS.out + 1.8, 115, front + 0.9, -1.2, 2.5], [115, SEE, front + 0.9, -6, 2.7], [-115, -59.5, front + 0.9, -1.2, 2.5], [-SEE, -115, front + 0.9, -6, 2.7]];
   const brush = [[-SEE, far - 0.6, park.x0 - 0.6, far - 0.6], [park.x0 - 0.6, far - 0.6, park.x0 - 0.6, park.z0 - 0.6], [park.x0 - 0.6, park.z0 - 0.6, park.x1 + 0.6, park.z0 - 0.6],
     [park.x1 + 0.6, park.z0 - 0.6, park.x1 + 0.6, far - 0.6], [park.x1 + 0.6, far - 0.6, SEE, far - 0.6],
-    [SEE, front + 0.35, E + 0.6, front + 0.35], [E + 0.6, front + 0.35, E + 0.6, 0.2], [-58.6, front + 0.35, -SEE, front + 0.35]];
-  const open = [[park.x0 - 1.5, park.x1 + 1.5, park.z0 - 1.3, far], [-59.4, W + 0.2, front - 0.3, 0.3]];   // kept clear of trees: the park, the county's yard
-  const open2 = (x, z) => z >= front ? x > W && x < E : z >= far || (z > park.z0 && x > park.x0 && x < park.x1);   // open ground, the road and its verges all the way along (past where you can walk them)
+    [SEE, front + 0.35, BUS.out + 0.9, front + 0.35], [BUS.out + 0.9, front + 0.35, BUS.out + 0.9, 0.2], [-58.6, front + 0.35, -SEE, front + 0.35]];
+  const open = [[park.x0 - 1.5, park.x1 + 1.5, park.z0 - 1.3, far], [-59.4, W + 0.2, front - 0.3, 0.3], [E - 2, BUS.out + 0.6, front - 0.3, 0.3]];   // (and the bus stop's)   // kept clear of trees: the park, the county's yard
+  const open2 = (x, z) => z >= front ? x > W && x < BUS.out + 0.4 : z >= far || (z > park.z0 && x > park.x0 && x < park.x1);   // open ground, the road and its verges all the way along (past where you can walk them)
   return { W, E, roadW, roadE, front, far, park, SEE, woods, brush, open, inside, open2,
     off: (x, z) => z <= SERVICE_ROAD.FRONT && !inside(x, z) };   // (behind the walk it's the service road's fence: SERVICE_ROAD.behindFence)
 })();
+// the crosswalk from the lot over the road to the park: down the middle of stall 12 (kept clear: nobody parks in it, it's the way through), a gap in
+// the lot's curb, a strip of concrete over the verge, the stripes across the road, and the park's gate across the walk from it (fenceZ: the park's
+// fence along its front, gate: how wide its opening is). w: how wide the stripes run
+const CROSS = { x: WALL_L - 20 + 2.6 * 13, w: 3.0, fenceZ: EDGE.far + 0.15, gate: 1.8 };
+LOT.noPark.push(12);
 const CURB_H = -LOT_Y_ + 0.008, CURB_Y = (LOT_Y_ + 0.008) / 2;   // a curb: from the paving up to 8 mm proud of the walk and grass (flush, its top fought theirs)
 // where it's paved for driving (the lot, the driveways, the road): 12 cm down, a curb's height under the walk and the grass
 function pavedAt(x, z) {
   const hw = LOT.gateW / 2;
   if (z < LOT.roadNear && z > LOT.roadFar) return true;
   if (z < -1.8 && z > LOT.curb) return x > LOT.gates[0] - hw && x < LOT.gates[1] + hw;
+  if (z >= LOT.roadNear && x > BUS.in && x < BUS.out && z <= BUS.edge(x)) return true;   // the bus's bay
   return z <= LOT.curb && z >= LOT.roadNear && LOT.drives.some(([a, b]) => x > a - 0.3 && x < b + 0.3);
 }
 const ROOF = { y: 4.0, wall: 0.91, rects: [[-7.84, 11.1, -0.1, 35.1], [-7.84, 2.1, 35.1, 48.6]],   // the building's footprint (outer wall faces) and its flat roof: deck top y, parapet height

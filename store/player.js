@@ -529,7 +529,7 @@ function lowBlocker(x, z) {                      // what's in the way here, if i
   return low;
 }
 function fallStart(why, kx = 0, kz = 0, over = null) {   // over: tripped on it. Headfirst, along (kx, kz)
-  if (fall) return;
+  if (fall) return; PARK.run = null;
   if (mantle) { mantle = null; me.reachTo(null); me.reachAlso(null); }
   jump.air = false; jump.v = jump.vx = jump.vz = 0; jump.peak = null;
   const lx = -Math.sin(player.yaw), lz = -Math.cos(player.yaw), toward = kx * lx + kz * lz > 0;   // (backwards: away from what you hit, or just back; a trip: along)
@@ -723,16 +723,17 @@ function move(dt) {
   if (keys.has("KeyS") || keys.has("ArrowDown")) iz -= 1;
   if (keys.has("KeyD") || keys.has("ArrowRight")) ix += 1;
   if (keys.has("KeyA") || keys.has("ArrowLeft")) ix -= 1;
+  const run = airborne ? (PARK.run = null) : parkRun(dt, ix, iz);   // off the merry-go-round fast: running with it, keys or not (exterior/playground.js)
   if (airborne) {                                // a little give in the air, no more: you go where you jumped
     if (iz > 0) { const to = mantleFind(f.x, f.z); if (to) return mantleStart(to, f.x, f.z); }
     if (ix || iz) { const L = Math.hypot(ix, iz), k = JUMP.airControl * dt / L; jump.vx += (f.x * iz + rt.x * ix) * k; jump.vz += (f.z * iz + rt.z * ix) * k; }
     return;
   }
-  if (!ix && !iz) { jump.vx = jump.vz = 0; return; }
-  const sp = ((keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 5.2 * (has("you", "con", 5) ? 1.15 : 1) : 3.1) * (1 + 0.02 * (lv("you", "con") - 1));   // (CON: quicker on your feet; Second Wind)
-  const crouched = keys.has("KeyC");
-  const spd = sp * (crouched ? 0.55 : 1) * (hungover() ? 0.75 : 1) * (jump.recover > 0 ? 0.6 : 1);
-  const dx = (f.x * iz + rt.x * ix) * spd * dt, dz = (f.z * iz + rt.z * ix) * spd * dt;
+  if (!ix && !iz && !run) { jump.vx = jump.vz = 0; return; }
+  const sp = run ? run.v : ((keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 5.2 * (has("you", "con", 5) ? 1.15 : 1) : 3.1) * (1 + 0.02 * (lv("you", "con") - 1));   // (CON: quicker on your feet; Second Wind)
+  const crouched = !run && keys.has("KeyC");
+  const spd = run ? sp : sp * (crouched ? 0.55 : 1) * (hungover() ? 0.75 : 1) * (jump.recover > 0 ? 0.6 : 1);
+  const dx = run ? run.x * spd * dt : (f.x * iz + rt.x * ix) * spd * dt, dz = run ? run.z * spd * dt : (f.z * iz + rt.z * ix) * spd * dt;
   { const sign = spd >= FALL.bonk && hangerAt(player.x + dx, player.z + dz); if (sign) { const L = Math.hypot(dx, dz); return fallStart(`Right in the ${sign.name}`, -dx / L, -dz / L); } }   // at a run. A walk, it just stops you
   jump.vx = dx / dt; jump.vz = dz / dt;           // (what you'd take off with)
   const x0 = player.x, z0 = player.z, top = !player.inBooth && floorHeightAt(x0, z0) > TALL.booth - 0.1;

@@ -210,8 +210,15 @@ function tgSend() {
   // other's copy (the host's is the one that counts); on a swing (which one, + 1) and where it's got to
   const R = PARK.ride, su = seesawOn(), see = R?.kind === "seesaw" ? [1, R.e] : su != null ? [2, r(su)] : [0, 0];
   const sw = R?.kind === "swing" ? [R.i + 1, r(SWING.seats[R.i].th), r(swingAt(SWING.seats[R.i]).r)] : [0, 0, 0];
+  // the merry-go-round: stood between two of its spokes (1: which gap), or just stood on its deck (2: where on it, and which way you face,
+  // in its own turning frame), and how it's turned and going: on the other copy you're carried round on theirs, not left where you were
+  // and where your hands are going, if they're on something (a rung, a counter, a mop): on a ride, their copy works that out from its own ride
+  const hands = me.reaching.flatMap((h, j) => h ? [1, r(h.target.x), r(h.target.y), r(h.target.z), h.arm === 0 ? 0 : 1, j === 0 && h.lean === false ? 0 : 1] : [0, 0, 0, 0, 0, 0]);
+  const rx = player.x - ROUND.x, rz = player.z - ROUND.z, ra = roundAngle();
+  const onDeck = !R && !fall && !jump.air && Math.hypot(rx, rz) < 1.42 && Math.abs(player.airH + floorHeightAt(player.x, player.z) - ROUND.top) < 0.05;
+  const rd = R?.kind === "round" ? [1, R.i, 0, 0] : onDeck ? [2, r(wrapPi(Math.atan2(-rz, rx) - ra)), r(Math.hypot(rx, rz)), r(wrapPi(me.group.rotation.y - ra))] : [0, 0, 0, 0];
   try { T.pos.send(JSON.stringify([r(g.x), r(g.y), r(g.z), r(me.group.rotation.y), pose, fall ? r(fall.prone ? -fall.tilt : fall.tilt) : sit?.hipY ?? 0, sit?.tuck ?? 0, jump.air || mantle ? 1 : 0,
-    ...see, r(SEESAW.a), r(SEESAW.w), ...sw])); } catch {}
+    ...see, r(SEESAW.a), r(SEESAW.w), ...sw, ...rd, r(ROUND.th), r(ROUND.w), ...SWING.seats.flatMap(S => [r(S.th), r(S.w)]), ...hands])); } catch {}
 }
 function tgOnCtl(data, mine) {
   const T = together; if (mine !== T.try) return;
@@ -226,6 +233,7 @@ function tgOnCtl(data, mine) {
   if (d.t === "vcr") return tgVcrApply(d);
   if (d.t === "world") return tgWorldApply(d);
   if (d.t === "seesaw") { if (Math.abs(d.e) === 1) seesawPush(d.e, true); return; }   // they pushed off from their end
+  if (d.t === "round") { if (T.host && Number.isFinite(d.dw)) roundPush(Math.max(-3, Math.min(3, d.dw)), true); return; }   // the guest gave the merry-go-round a shove, or a kick
   if (d.t !== "hi" || T.peer) return;
   tgPeerArrives(String(d.name || "Player").replace(/[<>]/g, "").slice(0, 24), d.seed >>> 0, !!d.uniform, !!d.guest, d.outfit);
   if (T.host && playing) tgVcrSend();           // (a tape's already going: on theirs too)
@@ -237,8 +245,16 @@ function tgOnCtl(data, mine) {
 function tgOnPos(data, mine) {
   const T = together, P = T.peer; if (mine !== T.try || !P) return;
   let a; try { a = JSON.parse(data); } catch { return; }
-  if (!Array.isArray(a) || (a.length !== 8 && a.length !== 15) || !a.every(Number.isFinite)) return;   // (8: from a copy of the game before the park's rides were shared)
-  if (a.length === 15) {
+  if (!Array.isArray(a) || (a.length !== 8 && a.length !== 15 && a.length !== 37) || !a.every(Number.isFinite)) return;   // (8: from a copy of the game before the park's rides were shared; 15: before the merry-go-round, the empty swings and hands were)
+  if (a.length === 37) {
+    P.seats = [{ th: a[21], w: Math.max(-12, Math.min(12, a[22])) }, { th: a[23], w: Math.max(-12, Math.min(12, a[24])) }];
+    const hand = o => a[o] === 1 && Math.abs(a[o + 1] - a[0]) < 3 && Math.abs(a[o + 2] - a[1]) < 4 && Math.abs(a[o + 3] - a[2]) < 3 ? { p: new THREE.Vector3(a[o + 1], a[o + 2], a[o + 3]), arm: a[o + 4], lean: a[o + 5] !== 0 } : null;   // (within arm's reach of them, or it's nonsense)
+    P.hands = [hand(25), hand(31)];
+    P.round = a[15] === 1 && a[16] >= 0 && a[16] < 4 ? { i: a[16] | 0 } : null;
+    P.deck = a[15] === 2 && a[17] >= 0 && a[17] < 1.5 ? { a: a[16], r: a[17], ry: a[18] } : null;
+    P.roundTh = a[19]; P.roundW = Math.max(-ROUND.max, Math.min(ROUND.max, a[20]));
+  } else { P.round = P.deck = P.roundTh = P.seats = null; P.hands = [null, null]; }
+  if (a.length >= 15) {
     P.see = a[8] === 1 && Math.abs(a[9]) === 1 ? { ride: true, e: a[9] } : a[8] === 2 && Math.abs(a[9]) < 2 ? { ride: false, u: a[9] } : null;
     P.seeA = Math.max(-SEESAW.max, Math.min(SEESAW.max, a[10])); P.seeW = Math.max(-10, Math.min(10, a[11]));
     P.swing = a[12] >= 1 && a[12] <= SWING.seats.length ? { i: a[12] - 1, th: a[13], r: Math.max(0, Math.min(SWING.L, a[14])) } : null;
@@ -403,6 +419,14 @@ function togetherTick(dt) {                     // the main loop: eases them to 
   if (P.see?.ride) { const s = seesawSeat(P.see.e); g.position.set(s.x, s.y + 0.03 - 0.45, s.z); g.rotation.y = P.ry = Math.atan2(s.dx, s.dz); g.rotation.x = 0; P.speed = 0; }
   else if (P.swing) { const S = SWING.seats[P.swing.i], s = swingAt(S), hip = 0.06, hipY = 0.5;
     g.position.set(s.x + s.ux * hip - s.ux * hipY, s.y + s.uy * hip - s.uy * hipY, s.z + s.uz * hip - s.uz * hipY); g.rotation.y = P.ry = SWING.ry; g.rotation.x = -S.th; P.speed = 0; }
+  else if (P.round) { const s = roundRider(P.round.i); g.position.set(s.bx, ROUND.top, s.bz); g.rotation.y = P.ry = s.ry; P.speed = 0; }   // between two spokes on this copy's merry-go-round
+  else if (P.deck) { const a = roundAngle(), [x, z] = parkWorld(P.deck.r, 0, ROUND.x, ROUND.z, a + P.deck.a); g.position.set(x, ROUND.top, z); g.rotation.y = P.ry = a + P.deck.ry; P.speed = 0; }   // stood on it: carried round
+  // their hands: on a ride, on this copy's bars and chains, where they are here; anything else (a rung, a counter), where they said
+  const H = P.see?.ride ? seesawHands(P.see.e) : P.swing ? swingHands(SWING.seats[P.swing.i]) : P.round ? roundRider(P.round.i).hands : null;
+  if (H) { P.c.reachTo(H[0], 0, { lean: !!P.round }); P.c.reachAlso(H[1], 1); }
+  else { const [h0, h1] = P.hands || [];
+    if (h0) P.c.reachTo(h0.p, h0.arm, { lean: h0.lean }); else P.c.reachTo(null);
+    if (h1) P.c.reachAlso(h1.p, h1.arm); else P.c.reachAlso(null); }
   P.c.tick(dt, P.speed < 0.15 || P.tilt > 0.05 ? 0 : P.speed);
 }
 
