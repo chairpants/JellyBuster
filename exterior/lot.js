@@ -240,14 +240,35 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   // the lot: different every day (the same all day, reload or not): a few cars, more on a busy day, in any
   // stall but the ones the lamp poles stand in, mostly nosed in, now and then backed in, never quite straight
   let parked = [];
+  // ---- the cars are solid: a box round each (its length along its nose, local +x, and its width; as tall as its roof, so you can get up on
+  // one). Parked ones get theirs once; those that move have theirs worked out again every frame (carsSolid). Driven into you, a car
+  // moving faster than a jog knocks you flying (carHit, store/player.js) ----
+  const carCol = (g, col = {}) => {
+    const s = g.userData.car, ry = g.rotation.y, c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry)), hl = s.L / 2 - 0.05, hw = s.W / 2 - 0.03;
+    const hx = hl * c + hw * sn, hz = hl * sn + hw * c, p = g.position;
+    return Object.assign(col, { x0: p.x - hx, x1: p.x + hx, z0: p.z - hz, z1: p.z + hz, y1: LOT.y + s.roofY });
+  };
+  const carDyn = [], carPrev = new WeakMap();
+  const carsSolid = dt => {
+    for (const c of carDyn) { const i = colliders.indexOf(c); if (i >= 0) colliders.splice(i, 1); } carDyn.length = 0;
+    for (const g of [...movers.map(m => m.g), ...lotCars.map(c => c.g)]) {
+      if (!g?.parent) continue;
+      const col = carCol(g); colliders.push(col); carDyn.push(col);
+      const p = g.position, was = carPrev.get(g); carPrev.set(g, { x: p.x, z: p.z });
+      if (!was || dt <= 0) continue;
+      const vx = (p.x - was.x) / dt, vz = (p.z - was.z) / dt; if (Math.hypot(vx, vz) < 2) continue;
+      const s = g.userData.car, ry = g.rotation.y, fx = Math.cos(ry), fz = -Math.sin(ry), dx = player.x - p.x, dz = player.z - p.z, r = player.r + 0.05;
+      if (Math.abs(dx * fx + dz * fz) < s.L / 2 + r && Math.abs(dx * fz - dz * fx) < s.W / 2 + r) carHit(vx, vz, p.x, p.z, s.W / 2, "Hit by a car");
+    }
+  };
   parkLot = (day, busy) => {
-    for (const g of parked) g.removeFromParent(); parked = [];
+    for (const g of parked) { g.removeFromParent(); const i = colliders.indexOf(g.userData.col); if (i >= 0) colliders.splice(i, 1); } parked = [];
     let seed = 7919 * day + 13; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const free = [...Array(22).keys()].filter(k => !LOT.noPark.includes(k)), pick = a => a[Math.floor(rnd() * a.length)];   // (1, 20: the driveways; 0, 21: past them, grass now)
     for (let n = 2 + Math.floor(rnd() * 4) + (busy ? 2 : 0); n > 0 && free.length; n--) {
       const k = free.splice(Math.floor(rnd() * free.length), 1)[0], backIn = rnd() < 0.25;
       parked.push(car(stallX(k) + (rnd() - 0.5) * 0.3, stallZ + 0.15 + (rnd() - 0.5) * 0.4, (backIn ? Math.PI : 0) + (rnd() - 0.5) * 0.12, { ...pick(STYLES), color: pick(PAINT) }));
-      parked.at(-1).userData.stall = k;
+      parked.at(-1).userData.stall = k; colliders.push(parked.at(-1).userData.col = carCol(parked.at(-1)));
     }
   };
   // and one driving by on the road: the ambience's passing-car sound calls this, so you see what you hear.
@@ -539,6 +560,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
   let sodiumT = null;                          // seconds since night fell while the lot lights warm up; null = settled
   const SODIUM_WARM = 5, cold = new THREE.Color(0xff4d1a), warm = new THREE.Color(0xffae4a);
   exteriorTick = dt => {
+    TVU.uFrontL.value.x = 3.4 * Math.max(0, 1 - tod.level * 1.4) * TVU.uZone.value.x;   // the store's light out through its glass after dark, while the front lights are on (frontLight, store/core.js)
     traffic = [...movers.filter(m => m.crash?.st !== "sat").map(m => ({ g: m.g, id: m.id, back: false })),
       ...lotCars.filter(c => c.g && LOT_MOVING.has(c.phase)).map(c => ({ g: c.g, id: c.id, back: c.phase === "backOut" })), ...busTraffic()];   // (the bus: exterior/bus.js)
     for (let i = movers.length - 1; i >= 0; i--) {   // the cars going by
@@ -566,7 +588,7 @@ scene.background = new THREE.Color(DAY_SKY);   // matches the default lights-on 
       if (m.vx || vz) m.g.rotation.y = Math.atan2(-vz, m.vx || dir * 0.01);   // (pointing the way it's going)
       if ((p.x - m.end) * dir > 0) { m.g.removeFromParent(); movers.splice(i, 1); m.then?.(); }
     }
-    lotTick(dt);
+    lotTick(dt); carsSolid(dt);
     if (sodiumT === null) return;
     sodiumT += dt;
     let done = true;

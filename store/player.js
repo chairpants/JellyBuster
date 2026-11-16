@@ -390,7 +390,7 @@ function blocked(x, z) {
   if (SERVICE_ROAD.behindFence(x, z) && !SERVICE_ROAD.behindFence(player.x, player.z)) return true;
   if (EDGE.off(x, z) && !EDGE.off(player.x, player.z)) return true;   // out front: the yard's fence, the woods, and the road's two ends (see EDGE, store/core.js)   // (the fence runs out to the treeline: no going round the end of it)
   if (CUSTOMER ? outBlocked(x, z) : tonyBlocked(x, z)) return true;
-  if (seesawBlocks(x, z)) return true;
+  if (seesawBlocks(x, z) || slideBlocks(x, z)) return true;
   for (const c of colliders) if (!c.staff)       // (you walk through the staff: they can't pin you in a corner)
     if (x > c.x0 - player.r && x < c.x1 + player.r && z > c.z0 - player.r && z < c.z1 + player.r) {
       if (c.y1 != null && player.airH + floorHeightAt(x, z) >= c.y1 - 0.02) continue;   // (off the ground and over the top of it. A top's a height in the world and airH's from the floor you're on: the theater's goes below ground)
@@ -445,7 +445,7 @@ function jumpStart() {
 function groundUnder(x, z) {                     // what you'd land on, up from the floor: the floor, or the top of something low you've got your feet over
   if (player.onRoof || player.inBooth) return 0;
   if (PARK.deck) return ROCKET.decks[PARK.deck] - floorHeightAt(x, z);   // (a deck of the rocket)
-  let g = seesawUnder(x, z, player.airH); const r = 0.12, f = floorHeightAt(x, z);
+  let g = Math.max(seesawUnder(x, z, player.airH), slideUnder(x, z, player.airH)); const r = 0.12, f = floorHeightAt(x, z);
   for (const c of colliders) if (c.y1 != null && c.y1 - f > g && c.y1 - f <= player.airH + 0.03 && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) g = c.y1 - f;
   return g;
 }
@@ -537,6 +537,22 @@ function fallStart(why, kx = 0, kz = 0, over = null) {   // over: tripped on it.
   fall = { stage: "drop", t: 0, v: 0, tilt: 0, a: 0, k: 0, a0: 0, plan: null, ux, uz, yaw0: player.yaw, fX: player.x, fZ: player.z, fY: playerFloor(), start: { x: player.x, z: player.z }, prone: !!over, roll: (Math.random() < 0.5 ? -1 : 1), why, vx: kx * FALL.knock, vz: kz * FALL.knock, drunk: drunk.lvl > 0, feet: { x: player.x, z: player.z } };
   me.slip(); ambStep(player.x, player.z, 1);
 }
+// struck by a car (exterior/lot.js) or the bus (exterior/bus.js) going (vx, vz), its middle at (cx, cz): thrown the way it was going and out
+// of its path, off your feet, and down hard (on your back, and longer before you can get up)
+function carHit(vx, vz, cx, cz, hw, why) {          // (hw: half its width)
+  if (fall || PARK.ride || PARK.climb || player.onRoof || player.inBooth || player.airH > 1.0) return;
+  if (seated || onStool || ladder.on) return;
+  const sp = Math.hypot(vx, vz), ux = vx / sp, uz = vz / sp, side = Math.sign((player.x - cx) * uz - (player.z - cz) * ux) || 1;
+  const nx = uz * side, nz = -ux * side;          // (square to the way it's going, on your side of it)
+  const tx = ux * sp * 0.75 + nx * (2 + sp * 0.2), tz = uz * sp * 0.75 + nz * (2 + sp * 0.2);
+  const along = (player.x - cx) * ux + (player.z - cz) * uz;   // out from under it first: beside it, where you were along it
+  player.x = cx + ux * along + nx * (hw + player.r + 0.12); player.z = cz + uz * along + nz * (hw + player.r + 0.12);
+  me.reachTo?.(null); me.reachAlso?.(null);
+  fallStart(why, tx, tz);                         // (over, the way you're thrown)
+  if (!fall) return;
+  player.airH = Math.max(player.airH, 0.12); Object.assign(fall, { v: 2 + sp * 0.18, vx: tx, vz: tz, hard: true });
+  ambStep(player.x, player.z, 1); toast(why, true);
+}
 function withRadius(r, test) { const was = player.r; player.r = r; try { return test(); } finally { player.r = was; } }
 function bodyBlocked(x, z, fx, fz, tilt = 1) {    // head at x, z; the torso from there on toward the feet, as far over as you've gone
   const at = d => d * tilt;
@@ -625,7 +641,7 @@ function fallTick(dt) {
   }
   F.t += dt;
   if (F.stage === "down") {
-    if (F.t >= FALL.lie && ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].some(k => keys.has(k))) {
+    if (F.t >= FALL.lie * (F.hard ? 3.5 : 1) && ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].some(k => keys.has(k))) {
       F.stage = "up"; F.t = 0; F.a1 = F.a; F.from = { x: F.fX, z: F.fZ, y: F.fY };
       const L = FALL.long * Math.sin(F.a), spots = [0, FALL.hip, 0.3, 1.0, L].map(d => [F.fX + F.ux * d, F.fZ + F.uz * d]).concat([[F.start.x, F.start.z]]);   // up where your feet are, or wherever along you there's room to stand
       F.to = spots.map(([x, z]) => { const top = fallSurface(x, z), air = top === Infinity ? 0 : Math.max(0, top - fallGround(x, z)); player.airH = air; const ok = top !== Infinity && !blocked(x, z); player.airH = 0; return ok ? { x, z, air } : null; }).find(Boolean) || { x: F.start.x, z: F.start.z, air: 0 };

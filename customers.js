@@ -20,7 +20,7 @@
 //     screen,             the face mesh (store.js marks it to glow)
 //     parts,              every mesh, for aiming at
 //     setMood(name),      neutral browse happy love meh wait impatient angry alarm thanks shifty ask off on
-//     setPose(name, opts), walk idle reach hold wait sit crouch; sit takes { hipY, tuck }:
+//     setPose(name, opts), walk idle reach hold carry wait sit crouch; sit takes { hipY, tuck }:
 //                         hip height (couch: 0.5) and extra knee bend to pull the feet back (a stool's footring)
 //     lookAt(yaw|null),   turn the head relative to the body
 //     holdTape(n),        how many tapes in hand, 0-3
@@ -1007,6 +1007,7 @@ window.StoreCustomers = (() => {
     }
     for (const m of Object.values(props)) m.visible = false;
     const item = new THREE.Group(); item.position.set(0, -0.4, 0.07); arms[0].el.add(item);   // holdItem's slot, in the same hand
+    const carry = new THREE.Group(); carry.position.set(0, 0.25, 0.37); upper.add(carry);   // carryItem's: out in front, between the hands (the "carry" pose's forearms), leaning with the body
     const tapes = [0, 1, 2].map(i => { const m = part(arms[1].el, BOX, solid("#151515"), 0.03, 0.19, 0.11, 0.035 * (i - 1), -0.36 - 0.012 * i, 0.07); m.visible = false; return m; });   // up to 3, side by side in one hand
 
     // snow settling on top of the TV (or the hat) and the shoulders: grown by setSnow (not in parts: nothing to aim at)
@@ -1060,6 +1061,11 @@ window.StoreCustomers = (() => {
         if (!K.down) { K.down = K.up.slice(); const c = skin.color; for (let i = 0; i < K.flags.length; i++) if (K.flags[i]) { const k = K.shade(i); K.down[i * 3] = c.r * k; K.down[i * 3 + 1] = c.g * k; K.down[i * 3 + 2] = c.b * k; } }
         a.array.set(on ? K.down : K.up); a.needsUpdate = true;
         K.materials.forEach((m, i) => { if (K.pantsTex.includes(m)) K.mesh.material[i] = on ? VCM : m; });   // (patterned trousers: that run of it drawn in the plain colours' material meanwhile)
+      },
+      carryItem(obj) {                                  // something carried flat in both hands, out in front (a pizza box): with setPose("carry")
+        carry.clear(); if (!obj) return;
+        group.updateWorldMatrix(true, true); const k = carry.getWorldScale(new THREE.Vector3());
+        obj.scale.divide(k); carry.add(obj);
       },
       holdItem(obj) {                                   // obj comes in at world scale: undo the body's own scaling
         item.clear(); if (!obj) return;
@@ -1176,11 +1182,12 @@ window.StoreCustomers = (() => {
         let lx = walking ? swU * aSw : 0, rx = walking ? -swU * aSw : 0;                   // arms: smaller than the legs, trailing them
         let le = walking ? -0.22 - Math.max(0, -swU) * 0.22 : -0.12, re = walking ? -0.22 - Math.max(0, swU) * 0.22 : -0.12;   // elbows bend on the forward swing
         if (run) { le += (-1.45 - Math.max(0, -swU) * 0.25 - le) * run; re += (-1.45 - Math.max(0, swU) * 0.25 - re) * run; }   // running: elbows at right angles, pumping
-        const free = !["hold", "reach", "wait", "lean", "read", "watch", "sit"].includes(pose) && !tapes[0].visible && !Object.values(props).some(m => m.visible);
+        const free = !["hold", "carry", "reach", "wait", "lean", "read", "watch", "sit"].includes(pose) && !tapes[0].visible && !Object.values(props).some(m => m.visible);
         if (free && walking && G.behind && !run) { lx = rx = 0.42; le = re = -0.55; }   // a stroll: hands clasped behind
         if (free && hunch > 0.05) { const k = Math.min(1, hunch * 1.3) * (1 - run); lx += (-0.4 - lx) * k; rx += (-0.4 - rx) * k; le += (-1.6 - le) * k; re += (-1.6 - re) * k; }   // hugging themselves
         if (pose === "reach") { rx = -1.45 - Math.sin(t * 3) * 0.05; re = -0.2; }
         if (pose === "hold") { rx = walking ? -0.35 : -0.45; re = -1.0; }
+        if (pose === "carry") { lx = rx = -0.28; le = re = -1.32; }                  // both forearms out level, under what's carried
         if (sit) { lx = rx = face.mood === "shock" ? -1.1 : -0.45; le = re = face.mood === "shock" ? -0.9 : -0.8; }   // hands in the lap (up when startled)
         if (pose === "wait") { lx = -0.25; le = -1.2; if (!tapes[0].visible) { rx = -0.25; re = -1.25; } }   // hands up on the counter
         if (pose === "lean") { lx = rx = -0.55; le = re = -1.05; }                  // forearms down on the counter, weight on them

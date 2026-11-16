@@ -142,6 +142,9 @@ function titleMenu() {
   bind("setSens", "sens", v => `${v}%`);
   bind("setInvert", "invertY", v => v ? "on" : "off");
   bind("setAA", "aa", v => v ? "on" : "off");
+  bind("setShadows", "shadows", v => v ? "on" : "off");
+  bind("setAO", "ao", v => v ? "on" : "off");
+  bind("setFilm", "film", v => v ? "on" : "off");
   bind("setShift", "shiftMin", v => `${v} min`);
   const tv = $("setTv"), tvV = $("setTvV"); tv.value = tvSet.volume; tvV.textContent = `${tvSet.volume}%`;
   tv.oninput = () => { tvSet.volume = +tv.value; tvV.textContent = `${tvSet.volume}%`; applyTv(); };   // (the same setting as the TV's own picture menu)

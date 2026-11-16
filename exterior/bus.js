@@ -147,7 +147,9 @@ function busPlace() {                              // the front axle to its poin
   for (const kp of bus.parts.steer) kp.rotation.y += (Math.max(-0.6, Math.min(0.6, steer)) - kp.rotation.y) * 0.35;
   const c = Math.abs(Math.cos(ry)), s = Math.abs(Math.sin(ry)), hx = BUS.len / 2 * c + BUS.wid / 2 * s, hz = BUS.len / 2 * s + BUS.wid / 2 * c;
   if (!bus.col) { bus.col = { x0: 0, x1: 0, z0: 0, z1: 0 }; colliders.push(bus.col); }
-  Object.assign(bus.col, { x0: cx - hx, x1: cx + hx, z0: cz - hz, z1: cz + hz });   // (it's in the way: nobody walks through a bus)
+  Object.assign(bus.col, { x0: cx - hx, x1: cx + hx, z0: cz - hz, z1: cz + hz, y1: LOT.y + 3.0 });   // (it's in the way: nobody walks through a bus)
+  if (bus.v > 2) { const fx = d.x, fz = d.y, dx = player.x - cx, dz = player.z - cz, r = player.r + 0.05;   // driven into you: knocked flying (store/player.js)
+    if (Math.abs(dx * fx + dz * fz) < BUS.len / 2 + r && Math.abs(dx * fz - dz * fx) < BUS.wid / 2 + r) carHit(fx * bus.v, fz * bus.v, cx, cz, BUS.wid / 2, "Hit by the bus"); }
 }
 function busGone() { bus.phase = "off"; bus.g.visible = false; if (bus.col) { colliders.splice(colliders.indexOf(bus.col), 1); bus.col = null; } }
 function busTick(dt) {
@@ -162,7 +164,7 @@ function busTick(dt) {
     if (!(carsOut?.lane?.(1) || []).some(p => p.x < -80)) { bus.slot = slot; busStart(); }   // (not on top of a car just starting out along the road)
   } else if (slot !== bus.slot && bus.phase === "off") bus.slot = slot;
   // nobody left to wait for: off they go, back up the path and away along the walk
-  if (!busComing(0.6)) for (const w of walkers) if (w.spot) { w.spot = null; w.waiting = false; w.c.setPose(w.box ? "hold" : "idle"); w.c.group.position.y = 0; w.path = [...BUS_UP().slice(1), [-24, SIDEWALK_Z - Math.random() * 0.3]]; w.then = walkerGone; }
+  if (!busComing(0.6)) for (const w of walkers) if (w.spot) { w.spot = null; w.waiting = false; w.c.setPose(w.box ? "carry" : "idle"); w.c.group.position.y = 0; w.path = [...BUS_UP().slice(1), [-24, SIDEWALK_Z - Math.random() * 0.3]]; w.then = walkerGone; }
   if (bus.phase === "off") return;
   const sc = busBay();
   bus.doors += Math.sign(bus.doorsTo - bus.doors) * Math.min(Math.abs(bus.doorsTo - bus.doors), dt / 0.7);   // the doors folding open, or shut
@@ -182,7 +184,7 @@ function busTick(dt) {
       bus.drops++;
     }
     if (bus.doors >= 1 && !bus.off.length && bus.t > bus.next) for (const w of walkers) if (w.waiting && !bus.boarding.has(w)) {   // their turn: up and to the door
-      bus.boarding.add(w); w.waiting = false; w.spot = null; w.c.setPose(w.box ? "hold" : "idle"); w.c.group.position.y = 0;
+      bus.boarding.add(w); w.waiting = false; w.spot = null; w.c.setPose(w.box ? "carry" : "idle"); w.c.group.position.y = 0;
       w.path = [[BUS.door[0], BUS.door[1] + 0.6], BUS.door]; w.then = w => { bus.boarding.delete(w); walkerGone(w); };
     }
     for (const w of bus.boarding) if (!walkers.includes(w)) bus.boarding.delete(w);

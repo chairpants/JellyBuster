@@ -82,7 +82,7 @@ function buildPlayground({ lam, ext }) {
     for (let i = 0; i < N; i++) { const a = (i + 0.5) * step; if (off(a, door) < step) continue; const [x, z] = at(1.52, a); solid(X + x - 0.05, X + x + 0.05, Z + z - 0.05, Z + z + 0.05); }   // the bars, at ankle height
     for (let i = 0; i < 4; i++) for (let r = 1.72; r < 2.8; r += 0.24) { const [x, z] = at(r, i * Math.PI / 2 + Math.PI / 4); solid(X + x - 0.08, X + x + 0.08, Z + z - 0.08, Z + z + 0.08); }   // the fins
     { const [x0, z0] = at(rho, lad[0], -0.24), [x1, z1] = at(rho, lad[0], 0.24); solid(X + Math.min(x0, x1) - 0.05, X + Math.max(x0, x1) + 0.05, Z + Math.min(z0, z1) - 0.05, Z + Math.max(z0, z1) + 0.05); }   // the first ladder
-    { const end = S.x0 + S.run + S.out; for (let x = S.x0; x < end - 0.01; x += 0.5) solid(X + x, X + Math.min(x + 0.5, end), Z - 0.3, Z + 0.3, rocketSlideY(Math.min(x + 0.25, end))); }   // the slide: you can hop the low end, and stop on the run-out
+    // (the slide's solid as a ramp, not boxes: see slideUnder / slideBlocks, at the end of the file)
     solid(X - 5.3, X - 5.1, Z - 0.36, Z + 0.36);
   }
 
@@ -205,6 +205,33 @@ function seesawBlocks(x, z) {                      // (blocked) the plank in you
   if (Math.abs(v) > 0.13 + r || Math.abs(u) > e + r) return false;
   const top = Math.max(seesawH(Math.max(-e, Math.min(e, u - r))), seesawH(Math.max(-e, Math.min(e, u + r))));
   return top > player.airH + floorHeightAt(x, z) + 0.3;
+}
+// ---- the slide, walked: up its chute from the low end (its surface under your feet, a step at a time), its rails keeping you on it once it's
+// high, solid wherever it's over your knees (no walking into its side, or under it). At the top, in through the gap onto the first deck ----
+const SLIDE_HW = 0.3, SLIDE_STEP = 0.5;          // half the chute's width; how high a bit of it you can step up onto from where your feet are
+function slideUV(x, z) { return [x - PLAYGROUND.rocket[0], z - PLAYGROUND.rocket[1]]; }   // (along it out from the rocket's middle, across it)
+const slideEnd = () => ROCKET.slide.x0 + ROCKET.slide.run + ROCKET.slide.out;
+function slideUnder(x, z, airH) {                  // (groundUnder) the chute under your feet, if you're up to it
+  if (PARK.deck || PARK.ride) return 0;
+  const [u, v] = slideUV(x, z); if (Math.abs(v) > SLIDE_HW || u < ROCKET.slide.x0 || u > slideEnd()) return 0;
+  const h = rocketSlideY(u) - floorHeightAt(x, z); return h <= airH + SLIDE_STEP ? h : 0;
+}
+function slideBlocks(x, z) {                       // (blocked) the chute in your way, or its rails, once you're up on it
+  if (PARK.deck || PARK.ride) return false;
+  const [u, v] = slideUV(x, z), r = player.r, S = ROCKET.slide, feet = player.airH + floorHeightAt(x, z);
+  if (Math.abs(v) > SLIDE_HW + r || u < S.x0 - r || u > slideEnd() + r) return false;
+  const top = rocketSlideY(Math.max(S.x0, Math.min(slideEnd(), u)));
+  if (top > feet + SLIDE_STEP) return true;        // (over your knees: a wall, from down there)
+  const [u0, v0] = slideUV(player.x, player.z), on = Math.abs(v0) <= SLIDE_HW && u0 >= S.x0 && u0 <= slideEnd() && Math.abs(player.airH + floorHeightAt(player.x, player.z) - rocketSlideY(u0)) < 0.2;
+  return on && top - floorHeightAt(x, z) > 0.6 && Math.abs(v) > SLIDE_HW - 0.12;   // (up on it, and high: the rails hold you in)
+}
+function slideClimbTick() {                        // (parkTick) walked right up it: in through the gap onto the first deck
+  if (PARK.deck || PARK.ride || PARK.climb || jump.air || fall || mantle) return;
+  const [u, v] = slideUV(player.x, player.z), S = ROCKET.slide;
+  { const h = slideUnder(player.x, player.z, player.airH); if (h > player.airH) player.airH = h; }   // (stepping up it: from the floor, nothing else lifts you)
+  if (Math.abs(v) < SLIDE_HW && u < S.x0 + 0.2 && player.airH + floorHeightAt(player.x, player.z) > ROCKET.decks[1] - 0.2) {
+    PARK.deck = 1; player.x = PLAYGROUND.rocket[0] + ROCKET.walk[1] - 0.15; player.z = PLAYGROUND.rocket[1]; player.airH = ROCKET.decks[1] - floorHeightAt(player.x, player.z); ambStep(player.x, player.z, 0.5);
+  }
 }
 function seesawOn() {                             // stood on the plank (or stepping onto its low part): -> u, or null
   if (jump.air || mantle || fall || PARK.deck || PARK.ride || PARK.climb || player.onRoof || player.inBooth) return null;
@@ -460,7 +487,7 @@ function parkClimbTick(dt) {
 function parkTick(dt) {
   PARK.t += dt;
   if (PARK.climb) parkClimbTick(dt);
-  seesawTick(dt); swingTick(dt); roundTick(dt);
+  seesawTick(dt); swingTick(dt); roundTick(dt); slideClimbTick();
   const R = PARK.ride; PARK.tilt = 0;
   if (R) R.t += dt;
   if (R?.kind === "swing") {

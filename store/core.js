@@ -271,6 +271,8 @@ const TVU = {
   // light spilling through doorways into a darker room next door (see spillTick), live ones first (uSpillN): per spill,
   // the light it comes from (xyz, inside the lit room) + reach past the door (w), its color x strength, the box it
   // lands in (x0, x1, z0, z1), and the door opening (plane: 0 z = const, 1 x = const; that const; center along it; half width); the color's w: a window's sill height
+  uFrontL: { value: new THREE.Vector2() },          // the store's and Tony's storefronts lit after dark: their light out on the walk and the lot (see frontLight)
+  uSunMap: { value: null }, uSunMat: { value: new THREE.Matrix4() }, uSunK: { value: 0 }, uSunIsDay: { value: 1 }, uSunTexel: { value: 1 / 2048 },   // the sun's (or the moon's) shadows outdoors: see sunShadowRender
   uSpillN: { value: 0 },
   uSpillD: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
   uSpillP: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
@@ -286,6 +288,20 @@ float stairCone(vec3 F, vec3 P, vec3 N) {        // a shaded bulb: a cone straig
   if ((F.x - wx) * (P.x - wx) < 0.0) { float t = (wx - F.x) / D.x; if (F.z + D.z * t < ${SHAFT.turn.toFixed(2)}) return 0.0; }
   vec3 L = -D * inversesqrt(d2);
   return smoothstep(0.42, 0.78, L.y) * (0.22 + 0.78 * max(dot(N, L), 0.0)) * 3.8 / (1.0 + 0.45 * d2);
+}
+float frontLight(vec3 P, vec3 N, float x0, float x1, float zf) {   // a lit storefront's glass (x0..x1, along z = zf, facing -z): its light on what's out in front of it
+  if (P.z > zf + 0.05 || P.z < zf - 12.0) return 0.0;
+  vec3 L = vec3(clamp(P.x, x0, x1), 1.5, zf) - P; float d2 = dot(L, L); L *= inversesqrt(d2);
+  float spread = 1.0 - smoothstep(0.0, 2.5, max(x0 - P.x, P.x - x1));   // (dying away past its ends)
+  return spread * max(L.z, 0.0) * (0.2 + 0.8 * max(dot(N, L), 0.0)) / (1.0 + 0.5 * d2);   // (out of the glass: what faces it most)
+}
+float sunShade(vec3 P, vec3 N, vec3 L) {        // the sun (or the moon) blocked, outdoors: 0 in shadow, 1 in the light. Soft: nine filtered looks round the spot
+  if (uSunK <= 0.0 || dot(N, L) <= 0.0) return 1.0;
+  vec4 c = uSunMat * vec4(P + N * 0.05 + L * 0.03, 1.0); vec3 s = c.xyz / c.w * 0.5 + 0.5;
+  if (s.x <= 0.0 || s.y <= 0.0 || s.x >= 1.0 || s.y >= 1.0 || s.z >= 1.0) return 1.0;
+  float k = 0.0; for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) k += texture(uSunMap, vec3(s.xy + vec2(float(i), float(j)) * uSunTexel * 1.3, s.z - 0.0004));
+  float edge = min(min(s.x, s.y), min(1.0 - s.x, 1.0 - s.y));   // (fading out toward the edges of what the map covers)
+  return mix(1.0, k / 9.0, uSunK * smoothstep(0.0, 0.06, edge));
 }
 float trofferLight(vec3 F, vec3 P) {             // one panel facing down, on the floor at P: its light out of the diffuser falling
   vec3 L = F - P; float d2 = dot(L, L); float c = (F.y - P.y) * inversesqrt(d2);   // off from straight under it (cos^6: a pool
@@ -353,9 +369,13 @@ const ROOM_FRAG = `
     vec3 sC = P - uThScreenP;                      // and what bounces round the room: the whole picture's colour, everywhere, a little less far back
     rl = thFl + uThGain * (scr * ${(14 / (TH_COLS * TH_ROWS)).toFixed(4)} + avg * ${(2.2 / (TH_COLS * TH_ROWS)).toFixed(4)} / (1.0 + 0.012 * dot(sC, sC)));
   } else {
-    vec3 sun = mix(uSunGround, uSunSky, 0.5 * rN.y + 0.5) + uSunC * max(dot(rN, uSunDir), 0.0);
-    vec3 moon = mix(uMoonGround, uMoonSky, 0.5 * rN.y + 0.5) + uMoonC * max(dot(rN, uMoonDir), 0.0);
+    float shSun = uSunIsDay > 0.5 ? sunShade(P, rN, uSunDir) : 1.0, shMoon = uSunIsDay > 0.5 ? 1.0 : sunShade(P, rN, uMoonDir);
+    float clear = uSunK * uSunIsDay * clamp(dot(uSunC, vec3(0.3, 0.5, 0.2)) / 0.8, 0.0, 1.0);   // a clear sun, high enough to cast: less of the sky's even light, more of the sun's own (the shade reads as shade)
+    vec3 sun = mix(uSunGround, uSunSky, 0.5 * rN.y + 0.5) * (1.0 - 0.38 * clear) + uSunC * max(dot(rN, uSunDir), 0.0) * shSun * (1.0 + 0.3 * clear);
+    vec3 moon = mix(uMoonGround, uMoonSky, 0.5 * rN.y + 0.5) + uMoonC * max(dot(rN, uMoonDir), 0.0) * shMoon;
     rl = mix(moon, sun, day); tvOut = 1.0;
+    if (uFrontL.x + uFrontL.y > 0.0) rl += uFrontL.x * vec3(0.75, 0.86, 1.0) * frontLight(P, rN, ${(WALL_L + 0.3).toFixed(2)}, ${(STORE.x - 0.3).toFixed(2)}, 0.0)
+      + uFrontL.y * vec3(1.0, 0.72, 0.42) * frontLight(P, rN, 13.5, 20.5, 0.1);
   }
   vec3 spill = vec3(0.0);                          // a lit room's light through its doorway, shaped by the opening, fading into the dark one
   for (int i = 0; i < 8; i++) {
@@ -406,6 +426,7 @@ for (const M of [THREE.MeshLambertMaterial, THREE.MeshPhongMaterial]) M.prototyp
       uniform vec3 uTvZoneP[9], uTvZoneC[9]; uniform highp sampler3D uTvVis; varying vec3 vTvPos;
       uniform vec4 uZone, uBoh, uFloorBox, uBohBox, uLobbyBox, uThBox; uniform vec3 uBohSplit; uniform vec4 uThLight, uTall; uniform vec2 uShaft; uniform vec4 uDeadL[3]; uniform vec3 uThScreenP; uniform float uThSconce, uOffice, uThGain; uniform vec3 uThZoneC[${TH_COLS * TH_ROWS}]; uniform vec2 uThScreenS;
       uniform vec4 uSpillP[8], uSpillC[8], uSpillB[8], uSpillD[8]; uniform int uSpillN;
+      uniform vec2 uFrontL; uniform highp sampler2DShadow uSunMap; uniform mat4 uSunMat; uniform float uSunK, uSunIsDay, uSunTexel;
       uniform vec3 uInSky, uInGround, uInAmb, uInDirC, uInDir, uSunSky, uSunGround, uSunC, uSunDir, uMoonSky, uMoonGround, uMoonC, uMoonDir, uDayC, uNightC, uFogC; uniform float uFogD, uFogCam;`)
     .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nfloat tvOut = 0.0;\n" + ROOM_FRAG + TV_FRAG)
     .replace("void main() {", TROFFER_GLSL + "\nvoid main() {")
@@ -567,20 +588,80 @@ function glowDrawsEnd() {
 }
 
 const rtSize = () => [Math.round(innerWidth * renderer.getPixelRatio()), Math.round(innerHeight * renderer.getPixelRatio())];
-const mainRT = new THREE.WebGLRenderTarget(...rtSize(), { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(...rtSize()) });
+const mainRT = new THREE.WebGLRenderTarget(...rtSize(), { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(...rtSize(), THREE.FloatType) });   // (float depth: fine enough for the shading where things meet, even on a floor seen edge-on)
 const glowRT = new THREE.WebGLRenderTarget(...rtSize(), { type: THREE.HalfFloatType, depthTexture: mainRT.depthTexture });
 const mixRT = new THREE.WebGLRenderTarget(...rtSize(), { type: THREE.HalfFloatType, depthBuffer: false });
 // subtle by default (lights on) — applyLighting() turns it up a bit for the dark. Its blur runs at half resolution
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.28, 0.3, 0.4);
+// Shading where things meet (ambient occlusion), from the depth the scene was drawn with, at half size: for each pixel, how much of what's
+// round it within half a metre stands up in front of its surface. Each pixel of a 4 x 4 tile looks a different way round, and the last
+// step blurs over the tile, never across a jump in depth, so it comes out smooth
+const aoRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+const SCREEN_VERT = "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }";
+const VIEW_AT = "vec3 viewAt(vec2 uv) { float d = texture2D(tDepth, uv).r; vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return p.xyz / p.w; }";
+const aoPass = new ShaderPass(new THREE.ShaderMaterial({
+  uniforms: { tDepth: { value: mainRT.depthTexture }, uProj: { value: camera.projectionMatrix }, uInvProj: { value: camera.projectionMatrixInverse }, uFull: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: SCREEN_VERT,
+  fragmentShader: `varying vec2 vUv; uniform sampler2D tDepth; uniform mat4 uProj, uInvProj; uniform vec2 uFull;
+    ${VIEW_AT}
+    void main(){
+      vec2 px = 1.0 / uFull, uc = (floor(vUv * uFull) + 0.5) * px;   // (a full-size pixel's own middle: half-size, vUv falls on the corner between four)
+      if (texture2D(tDepth, uc).r >= 1.0) { gl_FragColor = vec4(1.0); return; }
+      vec3 P = viewAt(uc);
+      vec3 l = viewAt(uc - vec2(px.x, 0.0)), r = viewAt(uc + vec2(px.x, 0.0)), b = viewAt(uc - vec2(0.0, px.y)), t = viewAt(uc + vec2(0.0, px.y));
+      vec3 dx = abs(r.z - P.z) < abs(P.z - l.z) ? r - P : P - l, dy = abs(t.z - P.z) < abs(P.z - b.z) ? t - P : P - b;   // (along the surface: the neighbour on the same side of any edge)
+      vec3 N = normalize(cross(dx, dy)); if (dot(N, P) > 0.0) N = -N;
+      float R = 0.5, z = -P.z; vec2 sc = vec2(uProj[0][0], uProj[1][1]) * 0.5 * R / z;
+      if (sc.y * uFull.y < 3.0) { gl_FragColor = vec4(1.0); return; }   // (a few pixels across: far off, it's nothing)
+      sc = min(sc, vec2(0.15));
+      vec2 ip = mod(floor(gl_FragCoord.xy), 4.0); float n = fract((ip.x * 4.0 + ip.y) * 0.3819660 + 0.123);   // (a different turn for each of the tile's 16)
+      float occ = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float a = (float(i) + n) * 2.39996 + n * 6.2832, rr = (float(i) + 0.5) / 12.0;
+        vec3 v = viewAt((floor((uc + vec2(cos(a), sin(a)) * rr * sc) * uFull) + 0.5) * px) - P; float vv = dot(v, v);
+        occ += max(0.0, dot(v, N) * inversesqrt(vv + 1e-6) - 0.15) * (1.0 - smoothstep(R * R, 4.0 * R * R, vv));   // (each look counts once at most: how far it stands up off the surface, as an angle)
+      }
+      float ao = max(0.55, 1.0 - occ * 1.1 / 12.0);   // (a corner's shaded, never blacked out)
+      gl_FragColor = vec4(mix(ao, 1.0, smoothstep(22.0, 40.0, z)));
+    }`,
+}));
+// The last step before the screen: the scene with that shading (blurred over its tile), plus the glow; then the film look: the
+// highlights rolled off rather than clipped, a touch more colour, the light a little warm, the corners down, a fine grain that moves
 const mixPass = new ShaderPass(new THREE.ShaderMaterial({
-  uniforms: { baseTexture: { value: null }, bloomTexture: { value: glowRT.texture } },
-  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }",
-  fragmentShader: `varying vec2 vUv; uniform sampler2D baseTexture; uniform sampler2D bloomTexture;
-    void main(){ gl_FragColor = texture2D(baseTexture, vUv) + vec4(1.0) * texture2D(bloomTexture, vUv); }`,
+  uniforms: { baseTexture: { value: null }, bloomTexture: { value: glowRT.texture }, tDepth: { value: mainRT.depthTexture }, tAO: { value: aoRT.texture },
+    uInvProj: { value: camera.projectionMatrixInverse }, uAO: { value: 1 }, uFilm: { value: 1 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uAORes: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: SCREEN_VERT,
+  fragmentShader: `varying vec2 vUv; uniform sampler2D baseTexture, bloomTexture, tDepth, tAO; uniform mat4 uInvProj; uniform float uAO, uFilm, uTime; uniform vec2 uRes, uAORes;
+    ${VIEW_AT}
+    float hash(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+    float aoAt() {                                 // the tile round this pixel, but only what's at about its depth
+      float zc = viewAt(vUv).z, s = 0.0, w = 0.0;
+      for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) {
+        vec2 u2 = vUv + (vec2(float(i), float(j)) - 1.5) / uAORes;
+        float wt = 1.0 / (0.002 + abs(viewAt(u2).z - zc) / max(0.05, -zc * 0.02));
+        s += texture2D(tAO, u2).r * wt; w += wt;
+      }
+      return s / w;
+    }
+    void main(){
+      vec4 base = texture2D(baseTexture, vUv);
+      float ao = uAO > 0.0 && texture2D(tDepth, vUv).r < 1.0 ? aoAt() : 1.0;
+      vec3 c = base.rgb * ao + texture2D(bloomTexture, vUv).rgb;
+      if (uFilm > 0.0) {
+        vec3 hi = max(c - 0.8, 0.0); c = min(c, 0.8) + 0.25 * (1.0 - exp(-hi * 4.0));   // the highlights rolled off instead of clipping (the darks and middles left alone)
+        float L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        c = max(mix(vec3(L), c, 1.05), 0.0);
+        c *= mix(vec3(0.99, 1.0, 1.015), vec3(1.025, 1.0, 0.97), smoothstep(0.03, 0.5, L));
+        vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0); c *= 1.0 - 0.22 * smoothstep(0.45, 1.1, length(q));
+        c *= 1.0 + (hash(gl_FragCoord.xy + fract(uTime * 7.31) * vec2(113.0, 71.0)) - 0.5) * 0.07;
+      }
+      gl_FragColor = vec4(c, base.a);
+    }`,
 }), "baseTexture");
 const outputPass = new OutputPass(); outputPass.renderToScreen = true;
 function bloomResize() {
-  const [w, h] = rtSize(); for (const rt of [mainRT, glowRT, mixRT]) rt.setSize(w, h);
+  const [w, h] = rtSize(); for (const rt of [mainRT, glowRT, mixRT]) rt.setSize(w, h); mixPass.uniforms.uRes.value.set(w, h);
+  const aw = Math.max(1, Math.round(w / 2)), ah = Math.max(1, Math.round(h / 2)); aoRT.setSize(aw, ah); mixPass.uniforms.uAORes.value.set(aw, ah); aoPass.uniforms.uFull.value.set(w, h);
   bloomPass.setSize(w / 2, h / 2);
 }
 bloomResize();
@@ -620,10 +701,47 @@ function lightsTick(dt) {
     s.position.setFromMatrixPosition(l.matrixWorld); s.updateMatrixWorld();
   }
 }
+// ---- the sun's shadows (the moon's, at night), outdoors: the scene's depth seen from the sun, over a square ~72 m across centred a way
+// ahead of you, drawn every frame (cars, people and the bus move). ROOM_FRAG's outdoors reads it (sunShade). Glass, glows, the sky and
+// anything see-through cast nothing; nor does what's inside a room you can't see into (it's under a roof anyway). Snapped to whole
+// texels as you move, or its edges would crawl ----
+const SUN = { size: LOWMEM ? 1024 : 2048, span: 72, deep: 240 };
+const sunRT = new THREE.WebGLRenderTarget(SUN.size, SUN.size, { depthTexture: new THREE.DepthTexture(SUN.size, SUN.size) });
+sunRT.depthTexture.compareFunction = THREE.LessEqualCompare; sunRT.depthTexture.minFilter = sunRT.depthTexture.magFilter = THREE.LinearFilter;
+TVU.uSunMap.value = sunRT.depthTexture; TVU.uSunTexel.value = 1 / SUN.size;
+const sunCam = new THREE.OrthographicCamera(-SUN.span / 2, SUN.span / 2, SUN.span / 2, -SUN.span / 2, 1, SUN.deep); sunCam.layers.enableAll();
+const sunDepthMat = new THREE.MeshBasicMaterial({ colorWrite: false, fog: false, side: THREE.DoubleSide });
+const sunNoCast = new WeakMap(), sunHid = [], sunV = new THREE.Vector3();
+const sunSkipMat = m => { if (Array.isArray(m)) return m.every(sunSkipMat); let k = sunNoCast.get(m);
+  if (k === undefined) { k = m.transparent || m.depthWrite === false || m.colorWrite === false || m.side === THREE.BackSide || m.fog === false || m.blending === THREE.AdditiveBlending; sunNoCast.set(m, k); } return k; };
+sunShadowRender.n = 0; sunShadowRender.was = -1;
+function sunShadowRender() {
+  const day = TVU.uZone.value.w >= 0.5, dir = day ? TVU.uSunDir.value : TVU.uMoonDir.value;
+  const k = SETTINGS.shadows ? Math.max(0, Math.min(1, (dir.y - 0.05) / 0.17)) * (day ? 1 : 0.8) : 0;
+  TVU.uSunK.value = k; TVU.uSunIsDay.value = day ? 1 : 0;
+  if (k <= 0 || (++sunShadowRender.n % 2 && TVU.uSunIsDay.value === sunShadowRender.was)) return;   // (every other frame: what moves out there moves slowly enough; a switch between sun and moon, at once)
+  sunShadowRender.was = TVU.uSunIsDay.value;
+  const f = camera.getWorldDirection(sunV), cx = camera.position.x + f.x * SUN.span * 0.28, cz = camera.position.z + f.z * SUN.span * 0.28;
+  sunCam.up.set(0, 1, 0); if (Math.abs(dir.y) > 0.98) sunCam.up.set(0, 0, 1);
+  sunCam.position.set(cx + dir.x * SUN.deep / 2, dir.y * SUN.deep / 2, cz + dir.z * SUN.deep / 2); sunCam.lookAt(cx, 0, cz); sunCam.updateMatrixWorld();
+  { const t = SUN.span / SUN.size, o = sunV.set(cx, 0, cz).applyMatrix4(sunCam.matrixWorldInverse);   // (whole texels)
+    sunCam.translateX(o.x - Math.round(o.x / t) * t); sunCam.translateY(o.y - Math.round(o.y / t) * t); sunCam.updateMatrixWorld(); }
+  TVU.uSunMat.value.multiplyMatrices(sunCam.projectionMatrix, sunCam.matrixWorldInverse);
+  scene.traverseVisible(o => { if (o.isPoints || o.isLine || o.isSprite || (o.isMesh && sunSkipMat(o.material))) sunHid.push(o); });
+  if (typeof roomGroups !== "undefined") for (const r in roomGroups) if (r !== "out" && roomGroups[r].visible) sunHid.push(roomGroups[r]);
+  for (const o of sunHid) o.visible = false;
+  const roofG = typeof roof !== "undefined" ? roof.g : null, roofWas = roofG?.visible; if (roofG) roofG.visible = true;   // (the roof's only drawn from up there; it still shades the ground behind the store)
+  const bg = scene.background; scene.background = null; scene.overrideMaterial = sunDepthMat;
+  renderer.setRenderTarget(sunRT); renderer.clear(); renderer.render(scene, sunCam);
+  scene.overrideMaterial = null; scene.background = bg;
+  for (const o of sunHid) o.visible = true; sunHid.length = 0; if (roofG) roofG.visible = roofWas;
+}
 scene.matrixWorldAutoUpdate = false;              // world matrices: worked out once a frame here, not again by each pass
 const clearWas = new THREE.Color();
 function renderWithBloom() {
   scene.updateMatrixWorld();
+  sunShadowRender();
+  const mu = mixPass.uniforms; mu.uAO.value = SETTINGS.ao ? 1 : 0; mu.uFilm.value = SETTINGS.film ? 1 : 0; mu.uTime.value = performance.now() / 1000;
   renderer.setRenderTarget(mainRT); renderer.render(scene, camera);
   // the glow: just the glowing things, over a clear (black) target that keeps mainRT's depth. (A color
   // background makes three clear the depth too, so the sky's out of this pass)
@@ -635,7 +753,8 @@ function renderWithBloom() {
   glowDrawsEnd();
   renderer.autoClear = true; camera.layers.mask = mask; scene.background = bg; renderer.setClearColor(clearWas, alpha);
   bloomPass.render(renderer, null, glowRT, 0, false);   // blurred, and added back onto glowRT
-  mixPass.render(renderer, mixRT, mainRT);               // the scene + the glow
+  if (SETTINGS.ao) aoPass.render(renderer, aoRT, null);   // the shading where things meet, at half size
+  mixPass.render(renderer, mixRT, mainRT);               // the scene (so shaded) + the glow
   outputPass.render(renderer, null, mixRT);              // tone mapping, sRGB, to the screen
 }
 
@@ -648,7 +767,7 @@ const SLOTS = 3, slotKey = n => n === 1 ? "jellybuster-save" : `jellybuster-save
 const SLOT = (() => { try { const n = +localStorage.getItem("jellybuster-slot"); return n >= 1 && n <= SLOTS ? n : 1; } catch { return 1; } })();
 const SAVE_KEY = slotKey(SLOT);
 // settings (per browser, not per store): see the title menu's SETTINGS
-const SETTINGS = { sound: 100, sens: 100, invertY: false, shiftMin: 21, aa: !LOWMEM, ...(() => { try { return JSON.parse(localStorage.getItem("jellybuster-settings")) || {}; } catch { return {}; } })() };
+const SETTINGS = { sound: 100, sens: 100, invertY: false, shiftMin: 21, aa: !LOWMEM, shadows: !LOWMEM, ao: !LOWMEM, film: true, ...(() => { try { return JSON.parse(localStorage.getItem("jellybuster-settings")) || {}; } catch { return {}; } })() };
 const SAVE_V = 3;                            // v1 keyed tapes by id (every season of a show shares it); v2 by catalog position (shifts when tapes are added)
 // a guest (see store/together.js): joined somebody else's game, so a customer in a store of the moment that's never saved. { who: the host, offer: till it's been answered }
 const GUEST = (() => { try { return JSON.parse(sessionStorage.getItem("jellybuster-guest")); } catch { return null; } })();

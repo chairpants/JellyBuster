@@ -449,7 +449,11 @@ function npcEnv(k, c, out, dt) {
 function npcPace(k, c, speed, ux, uz, dt) {      // their speed through the weather, walking (ux, uz); the wind carries them sideways a little
   const w = wxFall.uni.uWind.value, along = w.x * ux + w.y * uz, p = c.group.position;
   speed *= Math.max(0.55, Math.min(1.3, 1 + along * 0.04));   // fighting a headwind, helped along by a tailwind
-  p.x += (w.x - along * ux) * 0.025 * dt; p.z += (w.y - along * uz) * 0.025 * dt;   // (the path steers them back)
+  // pushed sideways off their line, a little, and no further: a gust staggers them, it doesn't carry them off (steering for a point 40 m
+  // down the walk, they'd barely steer back, and a steady wind walked people in through the storefronts). k.windOff: how far off it they are
+  const nx = -uz, nz = ux, off = k.windOff || 0;
+  let to = Math.max(-0.3, Math.min(0.3, off + (w.x * nx + w.y * nz) * 0.025 * dt)); to -= to * Math.min(1, dt * 0.4);
+  p.x += nx * (to - off); p.z += nz * (to - off); k.windOff = to;
   if (WX.kind === "rain" && WX.k > 0.25 && c.prop !== "umbrella") speed = Math.max(speed * 1.9, k.box ? 2.3 : 2.9);   // caught out: run for it (carefully, with a pizza)
   else if (WX.cover > 0.3) speed *= 0.85;        // short careful steps on the snow
   return speed;
@@ -467,7 +471,7 @@ function pizzaBox() {                            // a pizza box, carried flat
   const g = new THREE.Group(), box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.4), [0xe8dcc4, 0xe8dcc4, 0xf2ead8, 0xe8dcc4, 0xe8dcc4, 0xe8dcc4].map((c, i) => new THREE.MeshLambertMaterial({ color: c })));
   const lbl = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.12), new THREE.MeshBasicMaterial({ color: 0xc8312a })); lbl.rotation.x = -Math.PI / 2; lbl.position.y = 0.026; g.add(box, lbl); return g;
 }
-function walkerBox(w, on) { w.c.holdItem(on ? pizzaBox() : null); w.c.setPose(on ? "hold" : "idle"); w.box = on; }
+function walkerBox(w, on) { w.c.carryItem(on ? pizzaBox() : null); w.c.setPose(on ? "carry" : "idle"); w.box = on; }   // (flat, in both hands)
 // next door, now there's an inside to it: in through the door, up the aisle past the tables to a spot at the counter,
 // waiting there for the order (facing Tony), then back out the way they came with the box
 const TONY_SPOTS = [14.4, 15.3, 16.2, 17.1, 18.0], tonyTaken = new Set();
@@ -502,7 +506,32 @@ function pizzaRun() {                             // someone getting a pizza: by
     w.path = [[PIZZA_DOOR[0], SIDEWALK_Z], [from > 0 ? -24 : 24, SIDEWALK_Z]]; w.then = walkerGone;
   }));
 }
+// ---- out front, people keep out of each other's way: whoever's in front of them on their line (walkers, shoppers out there, you), they
+// go round, to the right when it's somebody coming the other way; and anyone they've ended up overlapping, they step apart from.
+// (Near the spot they're making for, no going round: they'd dance about it.) npcNear: everyone out there, gathered each frame ----
+const npcNear = [];
+function npcGather() {
+  npcNear.length = 0;
+  for (const w of walkers) if (w.c.group.visible) npcNear.push({ p: w.c.group.position, who: w });
+  for (const k of custs) if (k.c?.group.visible && k.c.group.position.z < 0.6) npcNear.push({ p: k.c.group.position, who: k });
+  for (const e of staff) if (e.c?.group.visible && e.c.group.position.z < 0.6) npcNear.push({ p: e.c.group.position, who: e });
+  if (!PARK.ride && !PARK.climb && player.z < 0.6) npcNear.push({ p: player, who: player });
+}
+function npcSteer(self, p, ux, uz, d) {           // -> the way to go instead of (ux, uz)
+  const rx = -uz, rz = ux; let side = 0;           // (r: their right)
+  for (const o of npcNear) {
+    if (o.who === self) continue;
+    const ox = o.p.x - p.x, oz = o.p.z - p.z, dd = Math.hypot(ox, oz); if (dd > 1.6 || dd < 1e-4) continue;
+    if (dd < 0.45 && o.who !== player) { const push = (0.45 - dd) * 0.25; p.x -= ox / dd * push; p.z -= oz / dd * push; }   // (ended up in each other: apart)
+    const ahead = ox * ux + oz * uz, lat = ox * rx + oz * rz;
+    if (d < 1.0 || ahead < 0.05 || ahead > 1.6 || Math.abs(lat) > 0.75) continue;
+    side += (lat > 0.1 ? -1 : 1) * (1 - ahead / 1.6) * (1 - Math.abs(lat) / 0.75);   // (they're off to the right: round them on the left; otherwise keep right)
+  }
+  if (!side) return [ux, uz];
+  const nx = ux + rx * side * 1.4, nz = uz + rz * side * 1.4, n = Math.hypot(nx, nz); return [nx / n, nz / n];
+}
 function walkerTick(dt) {
+  npcGather();
   const h = shift.h, night = h < 7 || h > 21.5;
   if (started && (walkerAt.t -= dt) <= 0) {        // somebody going by
     walkerAt.t = (night ? 70 + Math.random() * 120 : 18 + Math.random() * 40) * (WX.k > 0.3 ? 1.8 : 1);
@@ -510,7 +539,7 @@ function walkerTick(dt) {
   }
   const open = h >= 11 && h < 23, busy = (h > 11.5 && h < 13.5) || (h > 17 && h < 20.5);
   if (started && open && (walkerAt.pizzaT -= dt) <= 0) { walkerAt.pizzaT = (busy ? 25 : 70) + Math.random() * (busy ? 40 : 110); if (walkers.length < 5) pizzaRun(); }
-  pizzaGlow.material.opacity = open ? 0.85 * Math.max(0, 1 - tod.level * 1.4) : 0; pizzaGlow.visible = pizzaGlow.material.opacity > 0.01;
+  TVU.uFrontL.value.y = open ? 3.2 * Math.max(0, 1 - tod.level * 1.4) : 0;   // next door's lit front, on the walk and the lot in front of it (frontLight, store/core.js)
   for (const w of [...walkers]) {
     const c = w.c, p = c.group.position;
     if (!c.group.visible) { if (w.inside != null && (w.inside -= dt) <= 0) { w.inside = null; w.out(); } continue; }
@@ -519,23 +548,13 @@ function walkerTick(dt) {
     if (w.path.length) {
       const [tx, tz] = w.path[0], dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
       if (d < 0.05) w.path.shift();
-      else if (!c.busy) { speed = npcPace(w, c, w.speed * (night ? 1.12 : 1), dx / d, dz / d, dt); const st = Math.min(d, speed * dt); p.x += dx / d * st; p.z += dz / d * st; p.y = floorHeightAt(p.x, p.z); c.group.rotation.y = Math.atan2(dx, dz); }   // (a quicker step after dark)
+      else if (!c.busy) { const [sx, sz] = npcSteer(w, p, dx / d, dz / d, d); speed = npcPace(w, c, w.speed * (night ? 1.12 : 1), sx, sz, dt); const st = Math.min(d, speed * dt); p.x += sx * st; p.z += sz * st; p.y = floorHeightAt(p.x, p.z); c.group.rotation.y = Math.atan2(sx, sz); }   // (a quicker step after dark)
     } else { const f = w.then; w.then = null; f?.(w); if (!walkers.includes(w) || !c.group.visible) continue; }
     const rain = WX.kind === "rain" && WX.k > 0.2 && c.outfit.umbOwn; if (rain !== !!w.umb && !w.box) { w.umb = rain; c.holdProp(rain ? "umbrella" : null); }
     npcEnv(w, c, true, dt);
     c.tick(dt, speed);
   }
 }
-const pizzaGlow = (() => {                        // next door's lit front, on the walk and the lot in front of it
-  const W = 9, D = 6, c = document.createElement("canvas"); c.width = 256; c.height = 192; const g = c.getContext("2d"), img = g.createImageData(256, 192);
-  for (let y = 0; y < 192; y++) for (let x = 0; x < 256; x++) {
-    const u = (x + 0.5) / 256 * 2 - 1, v = (y + 0.5) / 192, a = Math.max(0, 1 - Math.abs(u) ** 2.5) * Math.exp(-v * 2.6) * Math.min(1, v * 20), i = (y * 256 + x) * 4;
-    img.data[i] = 255; img.data[i + 1] = 180 + 40 * (1 - v); img.data[i + 2] = 110; img.data[i + 3] = 255 * a;
-  }
-  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
-  m.rotation.x = -Math.PI / 2; m.position.set(PIZZA_DOOR[0] + 0.5, 0.03, -D / 2); m.layers.set(EXTERIOR_LAYER); scene.add(m); return m;
-})();
 // ---- getting past you (shared by customers and Dana) ----
 // you're standing on where they're headed: use a spot beside it (sideways to
 // the way they'd face there), whichever side is open
@@ -987,9 +1006,10 @@ function custStep(cust, dt) {
           }
         }
       }
-      const step = Math.min(d, speed * dt); p.x += dx / d * step; p.z += dz / d * step;
+      const [sx, sz] = p.z < 0.25 ? npcSteer(cust, p, dx / d, dz / d, d) : [dx / d, dz / d];   // (out front: round whoever's in the way. Inside, the store's own paths and custBumps)
+      const step = Math.min(d, speed * dt); p.x += sx * step; p.z += sz * step;
       p.y = floorHeightAt(p.x, p.z);
-      cust.ry = Math.atan2(dx, dz);
+      cust.ry = Math.atan2(sx, sz);
       if ((cust.stepD = (cust.stepD || 0) + step) > 0.7) { cust.stepD = 0; ambStep(p.x, p.z, 1); }   // footsteps
       // open any unlocked closed door right in front of them
       for (const door of doors) if (!door.open && !door.locked && !door.push) {

@@ -125,8 +125,8 @@ const storefront = (x0, x1, z) => {
   const segs = Math.max(1, Math.round(w / 2.6));                          // mullions every ~2.6m
   for (let i = 1; i < segs; i++) box(0.06, HEAD - KICK, 0.08, mat.mullion, x0 + i * (w / segs), (KICK + HEAD) / 2, z);
 };
-storefront(XL - T / 2, -1.8, 0);                                          // front-left: out to the wall's outer face (the side's skin covers the corner from there)
-storefront(1.8, XR, 0);                                                   // front-right
+storefront(XL - T / 2, -1.92, 0);                                         // front-left: out to the wall's outer face (the side's skin covers the corner from there)
+storefront(1.92, XR, 0);                                                  // front-right (both from the door's jambs' outer edge: from their inner face, the bulkhead's end flickered against the jamb's)
 box(3.6, H - 2.6, T, mat.wall, 0, 2.6 + (H - 2.6) / 2, 0);                 // above doors
 wall(XL - T / 2, XR + T / 2, Z, true, H, mat.wall, [{ c: BOH_DOORS.store, w: BOH_OPENING_W }]);   // back, with the open way through to the back hall
 wall(0, Z, XL, false, H, mat.wall);                                       // left

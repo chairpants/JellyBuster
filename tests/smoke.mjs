@@ -108,9 +108,9 @@ check("calendar: day 1 a Monday, Halloween busier with horror in season", cal ==
 const drive = await ev(() => {                   // a member with a car: it comes by, parks, they get out and walk up; gone, it backs out and leaves
   const m = __t.posTerm.members.find(m => m.active && !__t.custs.some(k => k.member === m)); m.car = { s: 1, c: 0x1f4a36 };
   const k = __t.custSpawn(m), out = [k.state, !!k.car];
-  for (let i = 0; i < 400 && k.state === "drivingIn"; i++) __t.exteriorTick(0.05);
+  for (let i = 0; i < 800 && k.state === "drivingIn"; i++) __t.exteriorTick(0.05);   // (40 s: in or out, it takes 15 to 21 depending on which way it comes and goes)
   out.push(k.car.phase, k.state, k.c.group.visible, Math.abs(k.c.group.position.x - k.car.door.x) < 0.01);
-  const car = k.car; __t.custGone(k); for (let i = 0; i < 400 && car.phase !== "gone"; i++) __t.exteriorTick(0.05);
+  const car = k.car; __t.custGone(k); for (let i = 0; i < 800 && car.phase !== "gone"; i++) __t.exteriorTick(0.05);
   out.push(car.phase, JSON.stringify(__t.posTerm.recordsAll()[m.num]?.car)); return out.join(); });
 check("a customer's own car: drives in, parks, they get out; leaving, it drives off; the car's on their record", drive === 'drivingIn,true,parked,arrive,true,true,gone,{"s":1,"c":2050614}', drive);
 check("sound effects follow mute (M) and the volume setting", await ev(() => {
